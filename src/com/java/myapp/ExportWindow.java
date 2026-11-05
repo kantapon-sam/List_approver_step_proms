@@ -16,8 +16,12 @@ final class ExportWindow {
     private final JTextField input=new JTextField();
     private final JButton browse=new JButton("Choose CSV"),run=new JButton("Run"),stop=new JButton("Stop"),openCsv=new JButton("Open CSV"),openFolder=new JButton("Open output folder");
     private final JLabel state=new JLabel("Ready"),detail=new JLabel("Enter your IDs in input.csv. Chrome opens only for sign-in."),fileLabel=new JLabel("No report yet");
+    private final JLabel queryLabel=new JLabel("No input started"),totalsLabel=new JLabel("No matching Refs loaded yet");
     private final JProgressBar progress=new JProgressBar();
     private final JTextArea log=new JTextArea();
+    private final RunProgress work=new RunProgress();
+    private final JTable requests=new JTable(work);
+    private static final int MAX_LOG_CHARS=120000;
     private final AtomicBoolean cancelled=new AtomicBoolean(),running=new AtomicBoolean();
     private UpdatePanel updates;
     private Path report;
@@ -44,13 +48,21 @@ final class ExportWindow {
         inputCard.setAlignmentX(Component.LEFT_ALIGNMENT); top.add(inputCard); top.add(Box.createVerticalStrut(14));
         JPanel statusRow=new JPanel(new BorderLayout(12,4)); statusRow.setOpaque(false);
         state.setFont(regular.deriveFont(Font.BOLD,17)); state.setForeground(ACCENT); statusRow.add(state,BorderLayout.WEST);
-        progress.setStringPainted(true); progress.setString("Ready"); progress.setPreferredSize(new Dimension(230,22)); statusRow.add(progress,BorderLayout.EAST);
+        progress.setStringPainted(true); progress.setString("Ready"); progress.setPreferredSize(new Dimension(340,22)); statusRow.add(progress,BorderLayout.EAST);
         JPanel stateBlock=new JPanel(new BorderLayout(0,5)); stateBlock.setOpaque(false); stateBlock.add(statusRow,BorderLayout.NORTH); detail.setForeground(MUTED); stateBlock.add(detail,BorderLayout.SOUTH);
+        queryLabel.setForeground(MUTED); stateBlock.add(queryLabel,BorderLayout.CENTER);
         stateBlock.setAlignmentX(Component.LEFT_ALIGNMENT); top.add(stateBlock); root.add(top,BorderLayout.NORTH);
         log.setEditable(false); log.setLineWrap(true); log.setWrapStyleWord(true); log.setFont(new Font(Font.MONOSPACED,Font.PLAIN,12)); log.setMargin(new Insets(10,10,10,10));
         JPanel activity=new JPanel(new BorderLayout(0,8)); activity.setOpaque(false);
         JLabel activityTitle=new JLabel("Run status"); activityTitle.setForeground(MUTED); activityTitle.setFont(regular.deriveFont(Font.BOLD));
-        activity.add(activityTitle,BorderLayout.NORTH); activity.add(new JScrollPane(log),BorderLayout.CENTER); root.add(activity,BorderLayout.CENTER);
+        activity.add(activityTitle,BorderLayout.NORTH); activity.add(new JScrollPane(log),BorderLayout.CENTER);
+        requests.setRowHeight(24); requests.setFillsViewportHeight(true); requests.setShowVerticalLines(false);
+        requests.getTableHeader().setReorderingAllowed(false);
+        int[] widths={55,110,130,180,170}; for(int i=0;i<widths.length;i++) requests.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
+        JPanel requestPanel=new JPanel(new BorderLayout(0,8)); requestPanel.setOpaque(false);
+        totalsLabel.setForeground(MUTED); requestPanel.add(totalsLabel,BorderLayout.NORTH); requestPanel.add(new JScrollPane(requests),BorderLayout.CENTER);
+        JSplitPane workArea=new JSplitPane(JSplitPane.VERTICAL_SPLIT,requestPanel,activity); workArea.setBorder(null); workArea.setOpaque(false); workArea.setResizeWeight(0.65); workArea.setDividerLocation(250);
+        root.add(workArea,BorderLayout.CENTER);
         JPanel bottom=new JPanel(new BorderLayout(0,8)); bottom.setOpaque(false);
         JPanel actions=new JPanel(new FlowLayout(FlowLayout.LEFT,8,0)); actions.setOpaque(false);
         run.setFont(regular.deriveFont(Font.BOLD)); run.setForeground(ACCENT); actions.add(run); actions.add(stop); actions.add(openCsv); actions.add(openFolder); bottom.add(actions,BorderLayout.NORTH);
@@ -66,8 +78,8 @@ final class ExportWindow {
                 frame.dispose(); System.exit(0);
             }
         });
-        frame.setContentPane(root); SwingUtilities.updateComponentTreeUI(frame); frame.setMinimumSize(new Dimension(820,520));
-        Dimension screen=Toolkit.getDefaultToolkit().getScreenSize(); frame.setSize(Math.min(1040,screen.width-50),Math.min(660,screen.height-70)); frame.setLocationRelativeTo(null);
+        frame.setContentPane(root); SwingUtilities.updateComponentTreeUI(frame); frame.setMinimumSize(new Dimension(900,600));
+        Dimension screen=Toolkit.getDefaultToolkit().getScreenSize(); frame.setSize(Math.min(1120,screen.width-50),Math.min(800,screen.height-70)); frame.setLocationRelativeTo(null);
         refreshControls(); frame.setVisible(true); loadLatest();
     }
 
@@ -77,7 +89,15 @@ final class ExportWindow {
     }
     private void appendLog(String value) {
         if(!SwingUtilities.isEventDispatchThread()) { SwingUtilities.invokeLater(() -> appendLog(value)); return; }
-        log.append(value+"\n"); log.setCaretPosition(log.getDocument().getLength());
+        log.append(value+"\n");
+        int excess=log.getDocument().getLength()-MAX_LOG_CHARS;
+        if(excess>0) log.replaceRange("",0,excess);
+        log.setCaretPosition(log.getDocument().getLength());
+    }
+    private void updateProgress() {
+        queryLabel.setText(work.inputText()); totalsLabel.setText(work.summaryText());
+        progress.setIndeterminate(work.searching()); progress.setMaximum(Math.max(1,work.total()));
+        progress.setValue(work.processed()); progress.setString(work.progressText());
     }
     private void setPhase(String title,String message) { state.setText(title); detail.setText(message); }
     private void stop() { cancelled.set(true); setPhase("Stopping","Waiting for the current browser operation to finish. Partial results will be kept."); refreshControls(); appendLog("Stop requested."); }
@@ -90,13 +110,15 @@ final class ExportWindow {
         final List<Query> queries; final Settings settings; final LoginCredentials credentials;
         try { queries=Query.read(Paths.get(input.getText().trim())); settings=Settings.read(home.resolve("proms.properties")); credentials=LoginCredentials.readOptional(home.resolve("Login.txt")); }
         catch(Exception ex) { JOptionPane.showMessageDialog(frame,Exporter.message(ex),"Check input / settings / Login.txt",JOptionPane.ERROR_MESSAGE); return; }
-        running.set(true); cancelled.set(false); log.setText("");
+        running.set(true); cancelled.set(false); log.setText(""); work.reset(); updateProgress();
         report=ListApproverProms.newOutput(home.resolve("output")); final Path output=report;
         fileLabel.setText("Output: "+output); fileLabel.setToolTipText(output.toString()); state.setForeground(ACCENT); setPhase("Starting","Preparing your run..."); progress.setIndeterminate(true); progress.setString("Starting"); refreshControls(); updates.refreshControls();
         RunObserver observer=new RunObserver() {
             public void phase(String title,String message) { SwingUtilities.invokeLater(() -> { if(!cancelled.get()) { setPhase(title,message); progress.setString(title); } }); }
-            public void query(int current,int total,String id) { SwingUtilities.invokeLater(() -> { if(!cancelled.get()) { progress.setIndeterminate(false); progress.setMaximum(total); progress.setValue(current-1); progress.setString("Input "+current+" of "+total); setPhase("Running in background","Searching input "+current+" of "+total+": "+id); } }); }
-            public void step(String ref,String step) { SwingUtilities.invokeLater(() -> { if(!cancelled.get()) detail.setText("Ref "+ref+"  /  "+step+"  /  Approval Line"); }); }
+            public void query(int current,int total,String id) { SwingUtilities.invokeLater(() -> { work.query(current,total,id); updateProgress(); if(!cancelled.get()) setPhase("Finding matching Refs","Searching and counting matching Refs for "+id+"..."); }); }
+            public void found(List<RunObserver.Reference> refs) { SwingUtilities.invokeLater(() -> { work.found(refs); updateProgress(); if(!cancelled.get()) setPhase("Running in background",refs.size()+" matching Refs found. Approval rows are written directly to CSV."); }); }
+            public void request(int index,RunObserver.RequestState status) { SwingUtilities.invokeLater(() -> { work.request(index,status); updateProgress(); if(status==RunObserver.RequestState.RUNNING && !cancelled.get()) setPhase("Running in background","Opening Ref "+work.activeRef()+"..."); }); }
+            public void step(String ref,String step) { SwingUtilities.invokeLater(() -> { work.step(ref,step); if(!cancelled.get()) detail.setText("Ref "+ref+"  /  "+step+"  /  Approval Line"); }); }
         };
         new SwingWorker<Integer,Void>() {
             @Override protected Integer doInBackground() throws Exception { return ListApproverProms.export(queries,settings,credentials,output,cancelled::get,ExportWindow.this::appendLog,observer); }
@@ -107,7 +129,7 @@ final class ExportWindow {
                 String title=code==0?"Completed":code==2?"Completed with issues":code==130?"Stopped":"Run failed";
                 state.setForeground(code==0?ACCENT:code==1?new Color(180,35,24):new Color(175,91,18));
                 setPhase(title,code==0?"Browser closed. CSV saved. Click Open CSV to view approval details.":"Browser closed. This report may be partial. See Run status for details.");
-                progress.setString(title); if(code==0 || code==2) progress.setValue(progress.getMaximum());
+                work.finish(code); updateProgress();
                 if(!Files.isRegularFile(output)) {
                     report=null; fileLabel.setText("No CSV created for this run"); fileLabel.setToolTipText(null);
                     detail.setText("Browser closed. No CSV created. See Run status for details.");

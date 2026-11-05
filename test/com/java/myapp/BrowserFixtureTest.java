@@ -44,7 +44,7 @@ public final class BrowserFixtureTest {
             require(((Number)driver.executeScript("return window.loginClicks")).intValue()==0,"sign-in waits for the user");
             browser.prefillLogin(LoginCredentials.parse(new StringReader("User,\nPassword,\n")));
             require(driver.findElement(org.openqa.selenium.By.id("username")).getAttribute("value").equals("fixture-user"),"manual fallback leaves fields untouched");
-            browser.search("240258");
+            browser.search("P-TEST-BASE");
             try { browser.prefillLogin(dummy); throw new AssertionError("credentials filled outside login page"); }
             catch (IllegalStateException expected) { }
             require(browser.allRows("requests").size()==3,"request pagination");
@@ -67,6 +67,16 @@ public final class BrowserFixtureTest {
             require("2".equals(driver.executeScript("return localStorage.getItem('searchCount');")),"exactly one search per input reference");
             require("2".equals(driver.executeScript("return localStorage.getItem('openRequests');")),"exactly one request opening per reference, not per step");
             require(((Number)((JavascriptExecutor)driver).executeScript("return window.writeActions")).intValue()==0,"no approve actions");
+            browser.openRequest("26070892");
+            final ChromeDriver streamingDriver=driver;
+            final int[] deliveredPages={0};
+            browser.readApprovals("NT_IE_TK08",page -> {
+                deliveredPages[0]++;
+                require(page.size()==(deliveredPages[0]==1?2:1),"approval data is delivered one page at a time");
+                String shown=(String)streamingDriver.executeScript("return document.querySelector('#approvals .pagination .active').innerText;");
+                require(shown.equals(Integer.toString(deliveredPages[0])),"page is delivered before clicking the next page");
+            });
+            require(deliveredPages[0]==2,"all streamed approval pages delivered");
             // A missing Approval Line column must fail visibly rather than export shifted values.
             browser.openRequest("26070892");
             ((JavascriptExecutor)driver).executeScript("var old=approvals; approvals=function(s,p){old(s,p);document.querySelector('#approvals th:last-child').innerText='Unexpected Column'};");

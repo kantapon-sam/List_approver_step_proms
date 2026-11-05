@@ -45,11 +45,11 @@ public final class ExportTest {
         } finally { Files.delete(noOutput); }
 
         List<Map<String,String>> requests = Arrays.asList(
-            map("refno","26070892","projectname","240258 : Demo"),
-            map("refno","260708920","projectname","2402580 : Similar project"),
-            map("refno","26070893","projectname","240258 : Demo"));
+            map("refno","26070892","projectname","P-TEST-BASE : Demo"),
+            map("refno","260708920","projectname","P-TEST-BASE0 : Similar project"),
+            map("refno","26070893","projectname","P-TEST-BASE : Demo"));
         equal(1,Exporter.matchingRequests(queries("Ref No\n26070892").get(0),requests).size(),"exact ref matching");
-        equal(2,Exporter.matchingRequests(queries("Project ID\n240258").get(0),requests).size(),"project expands to requests, not prefix");
+        equal(2,Exporter.matchingRequests(queries("Project ID\nP-TEST-BASE").get(0),requests).size(),"project expands to requests, not prefix");
         equal(0,Exporter.matchingRequests(queries("Ref No,Project ID\n26070892,999").get(0),requests).size(),"both IDs constrain match");
         equal("00999",Exporter.projectId(map("projectid","00999","projectname","Demo")),"explicit project column");
 
@@ -75,7 +75,7 @@ public final class ExportTest {
 
         StringWriter projectOutput = new StringWriter();
         Exporter byProject = new Exporter(portal,projectOutput,"fixture-only",s -> { });
-        byProject.run(queries("Project ID,Steps\n240258,TK07\n"));
+        byProject.run(queries("Project ID,Steps\nP-TEST-BASE,TK07\n"));
         equal(4,byProject.rows,"all matching requests for project");
         equal(0,byProject.problems,"successful project export");
         StringWriter automaticOutput = new StringWriter();
@@ -89,8 +89,8 @@ public final class ExportTest {
         equal(0,portal.requestPageScans,"direct reference matches do not scan request pages");
         check(automaticLog.stream().anyMatch(s -> s.startsWith("Search 2 of 2:")),"input progress includes total");
         equal(2,Exporter.matchingRequests(new Query(0,"","",Collections.emptySet()),Arrays.asList(requests.get(0),requests.get(0),requests.get(2))).size(),"automatic inventory deduplicates repeated requests");
-        rejects(() -> Exporter.matchingRequests(new Query(0,"","",Collections.emptySet()),Arrays.asList(map("projectid","240258"))));
-        List<Query> multipleProjects = queries("Ref No,Project ID\n,240258\n,240259\n");
+        rejects(() -> Exporter.matchingRequests(new Query(0,"","",Collections.emptySet()),Arrays.asList(map("projectid","P-TEST-BASE"))));
+        List<Query> multipleProjects = queries("Ref No,Project ID\n,P-TEST-BASE\n,240259\n");
         equal(2,multipleProjects.size(),"multiple project IDs use separate rows, no Steps column");
         check(multipleProjects.stream().allMatch(item -> item.acceptsStep("NT_IE_TK07")),"two-column input includes all steps");
         portal.cancel = true;
@@ -131,8 +131,8 @@ public final class ExportTest {
         }
         private List<Map<String,String>> requestRows() {
             if (search.equals("404")) return Collections.emptyList();
-            return Arrays.asList(map("refno","26070892","projectname","240258 : Demo"),
-                map("refno","26070893","projectname","240258 : Demo"));
+            return Arrays.asList(map("refno","26070892","projectname","P-TEST-BASE : Demo"),
+                map("refno","26070893","projectname","P-TEST-BASE : Demo"));
         }
         public List<Map<String,String>> approvals(String step) {
             if (step.endsWith("TK09")) throw new IllegalStateException("Approval Line column changed");

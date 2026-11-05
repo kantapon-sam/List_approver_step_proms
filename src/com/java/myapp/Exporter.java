@@ -25,7 +25,7 @@ final class Exporter {
     void run(List<Query> queries) throws IOException {
         int completed = 0;
         for (Query query : queries) {
-            observer.query(completed+1,queries.size(),query.search());
+            observer.query(completed+1,queries.size(),(query.ref.isEmpty()?"Project ID ":"Ref No ")+query.search());
             log.accept("Search " + (++completed) + " of " + queries.size() + ": "
                 + (query.ref.isEmpty() ? "Project ID " : "Ref No ") + query.search());
             List<Map<String,String>> requests;
@@ -38,12 +38,27 @@ final class Exporter {
             catch (RuntimeException ex) {
                 emit(query, empty(), empty(), empty(), "", "READ_ERROR", message(ex)); continue;
             }
+            List<RunObserver.Reference> references=new ArrayList<>();
+            for(Map<String,String> request:requests) references.add(new RunObserver.Reference(get(request,"refno"),projectId(request)));
+            observer.found(references);
+            log.accept("Found "+requests.size()+" matching Refs for input "+completed+".");
             if (requests.isEmpty()) {
                 emit(query, empty(), empty(), empty(), "", "NOT_FOUND_IN_SCOPE",
                     "No exact match in the configured list page. This does not prove the ID is absent from PROMs.");
                 continue;
             }
-            for (Map<String,String> request : requests) extractRequest(query, request);
+            for (int index=0;index<requests.size();index++) {
+                Map<String,String> request=requests.get(index);
+                int previousProblems=problems;
+                observer.request(index,RunObserver.RequestState.RUNNING);
+                try {
+                    extractRequest(query,request);
+                    RunObserver.RequestState result=problems==previousProblems?RunObserver.RequestState.COMPLETED:RunObserver.RequestState.ISSUES;
+                    observer.request(index,result);
+                    log.accept("Ref "+get(request,"refno")+": "+result.label+" ("+(index+1)+" / "+requests.size()+" processed).");
+                } catch(PromsBrowser.Cancelled ex) { observer.request(index,RunObserver.RequestState.STOPPED); throw ex; }
+                catch(IOException ex) { observer.request(index,RunObserver.RequestState.FAILED); throw ex; }
+            }
         }
         log.accept("Finished: " + rows + " CSV rows; " + problems + " issues. See this log for details.");
     }
@@ -71,18 +86,18 @@ final class Exporter {
             if (!query.acceptsStep(get(step,"step"))) continue;
             observer.step(get(request,"refno"),get(step,"step"));
             log.accept("  Ref " + get(request,"refno") + " / " + get(step,"step") + " / Approval Line");
-            List<Map<String,String>> approvals;
+            final int[] sequence={0};
             try {
-                approvals = portal.approvals(get(step,"step"));
-                for (Map<String,String> approval : approvals) {
-                    if (!approval.containsKey("approver") || !approval.containsKey("status") || !approval.containsKey("approveddate"))
-                        throw new IllegalStateException("Approval Line columns are incomplete.");
-                }
+                portal.readApprovals(get(step,"step"),approvals -> {
+                    for(Map<String,String> approval:approvals) {
+                        if(!approval.containsKey("approver") || !approval.containsKey("status") || !approval.containsKey("approveddate"))
+                            throw new IllegalStateException("Approval Line columns are incomplete.");
+                        emit(query,request,step,approval,""+(++sequence[0]),"OK","");
+                    }
+                });
             } catch (PromsBrowser.Cancelled ex) { throw ex; }
             catch (RuntimeException ex) { emit(query,request,step,empty(),"","READ_ERROR",message(ex)); continue; }
-            if (approvals.isEmpty()) emit(query,request,step,empty(),"","NO_APPROVAL_ROWS","Approval Line table is present and empty.");
-            int sequence = 0;
-            for (Map<String,String> approval : approvals) emit(query,request,step,approval,""+(++sequence),"OK","");
+            if(sequence[0]==0) emit(query,request,step,empty(),"","NO_APPROVAL_ROWS","Approval Line table is present and empty.");
         }
     }
 

@@ -170,6 +170,7 @@ public final class ListApproverProms {
                 log.accept(created ? "Incomplete CSV: " + output.toAbsolutePath() : "No CSV created for this run."); return 1;
             }
         } finally {
+            observer.phase("Finishing", "Closing the automation browser...");
             if (driver != null) try { driver.quit(); } catch (RuntimeException ignored) { log.accept("The automation Chrome session could not be closed."); }
             log.accept("Browser work finished. Run status remains in the application window. Open CSV for approval details.");
         }

@@ -1,5 +1,13 @@
 # Releases
 
+## 1.0.5
+
+- Show every matching Ref for a Project ID with Pending, Running, Completed, Completed with issues, Failed, Stopped or Not processed work status.
+- Count processed Refs instead of input CSV rows. Show per-input progress and overall completed/issue/remaining counts; preserve actual progress after cancellation.
+- Stream approval pages directly to CSV and flush each row before reading the next page. Retain compact work metadata instead of approval results in the window.
+- Limit on-screen run messages to 120,000 characters and use fixed-size page fingerprints for pagination-loop detection.
+- Verify ten-Ref projects, multiple inputs, partial page failures, cancellation, disk errors and immediate CSV writes with synthetic tests.
+
 ## 1.0.4
 
 - Simplify the desktop window to run progress and status, including input position and the current Ref/Step. Remove the Results table and all approval-status counters.

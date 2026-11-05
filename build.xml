@@ -32,6 +32,10 @@
         <java classname="com.java.myapp.DefaultFilesTest" fork="true" failonerror="true">
             <classpath path="${run.test.classpath}"/>
         </java>
+        <java classname="com.java.myapp.RunProgressTest" fork="true" failonerror="true">
+            <jvmarg value="-Djava.awt.headless=true"/>
+            <classpath path="${run.test.classpath}"/>
+        </java>
     </target>
     <target name="test-fixture" depends="compile-test" description="Headless browser on a localhost fixture only.">
         <java classname="com.java.myapp.BrowserFixtureTest" fork="true" failonerror="true">

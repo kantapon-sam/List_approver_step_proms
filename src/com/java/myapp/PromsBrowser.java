@@ -84,7 +84,7 @@ final class PromsBrowser implements Portal {
         Set<String> pages = new HashSet<>();
         for (int page = 0; page < settings.maxPages; page++) {
             List<Map<String,String>> rows = snapshot(kind);
-            if (!pages.add(rows.toString())) throw new IllegalStateException("Repeated " + kind + " page; export would be incomplete.");
+            if (!pages.add(pageFingerprint(rows))) throw new IllegalStateException("Repeated " + kind + " page; export would be incomplete.");
             result.addAll(rows);
             if (kind.equals("requests")) log.accept("Filtered results page " + (page + 1) + ": " + result.size() + " rows read.");
             WebElement next = (WebElement) dom("next", kind, null);
@@ -108,6 +108,33 @@ final class PromsBrowser implements Portal {
     }
 
     public List<Map<String,String>> approvals(String step) {
+        openApprovalLine(step);
+        return allRows("approvals");
+    }
+
+    @Override public void readApprovals(String step,Portal.ApprovalPage sink) throws IOException {
+        openApprovalLine(step);
+        // Keep one page of approval data at a time; store only small fingerprints for loop detection.
+        Set<String> pages=new HashSet<>();
+        for(int page=0;page<settings.maxPages;page++) {
+            List<Map<String,String>> rows=snapshot("approvals");
+            if(!pages.add(pageFingerprint(rows))) throw new IllegalStateException("Repeated approvals page; export would be incomplete.");
+            sink.accept(rows);
+            WebElement next=(WebElement)dom("next","approvals",null);
+            if(next==null) return;
+            click(next); settle();
+        }
+        throw new IllegalStateException("Reached max.pages for approvals; export would be incomplete.");
+    }
+
+    private static String pageFingerprint(List<Map<String,String>> rows) {
+        try {
+            byte[] hash=java.security.MessageDigest.getInstance("SHA-256").digest(rows.toString().getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(hash);
+        } catch(java.security.NoSuchAlgorithmException ex) { throw new IllegalStateException(ex); }
+    }
+
+    private void openApprovalLine(String step) {
         closeStepDialog();
         if (dom("link", "steps", step) == null) {
             WebElement first = (WebElement)dom("first", "steps", null);
@@ -117,7 +144,6 @@ final class PromsBrowser implements Portal {
         WebElement tab = waitFor().until(d -> (WebElement) dom("approvalTab", null, null));
         click(tab); settle();
         requireTable("approvals");
-        return allRows("approvals");
     }
 
     private void closeStepDialog() {
@@ -132,7 +158,7 @@ final class PromsBrowser implements Portal {
         Set<String> pages = new HashSet<>();
         for (int page = 0; page < settings.maxPages; page++) {
             List<Map<String,String>> rows = snapshot(kind);
-            if (!pages.add(rows.toString())) throw new IllegalStateException("Repeated page while opening " + value);
+            if (!pages.add(pageFingerprint(rows))) throw new IllegalStateException("Repeated page while opening " + value);
             WebElement link = (WebElement) dom("link", kind, value);
             if (link != null) { click(link); settle(); return; }
             WebElement next = (WebElement) dom("next", kind, null);
