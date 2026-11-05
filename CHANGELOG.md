@@ -1,5 +1,18 @@
 # Releases
 
+## 1.0.1
+
+For a new installation, download **List_approver_step_proms-1.0.1-windows.zip**, extract it and double-click the JAR with Java 8. Existing users can click the update button in the application.
+
+- Read all approvals automatically: every visible Pending Approval request, every page and every Activity/Milestone step. No input CSV or step entry is required in the desktop window.
+- Show request-page progress, total request count and current request/step. Stop keeps a clearly marked partial CSV.
+- Use English throughout the application, update dialogs and documentation.
+- Distribute blank files with their real names: Login.txt, input.csv and proms.properties. The optional input CSV has only Ref No and Project ID; no Steps column or sample IDs.
+- Keep existing user files. Retire untouched v1.0.0 example templates when the application opens.
+- Keep a separate compatible updater archive for existing v1.0.0 installations.
+
+The Windows ZIP includes blank user files. The other ZIP is used by the built-in updater. Neither contains real credentials. Automated workflow validation uses a local browser fixture; live PROMs extraction still requires verification.
+
 ## 1.0.0
 
 First public release, resetting the earlier local prototype version numbers.

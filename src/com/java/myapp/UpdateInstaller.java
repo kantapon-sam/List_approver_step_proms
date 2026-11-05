@@ -15,6 +15,8 @@ public final class UpdateInstaller {
     interface MutationHook { void afterChange(int count) throws IOException; }
 
     public static void main(String[] args) {
+        Locale.setDefault(Locale.ENGLISH);
+        javax.swing.JComponent.setDefaultLocale(Locale.ENGLISH);
         Path home=null,stage=null;
         boolean installed=false;
         try {

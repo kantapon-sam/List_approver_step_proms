@@ -63,6 +63,17 @@ public final class ExportTest {
         byProject.run(queries("Project ID,Steps\n240258,TK07\n"));
         equal(4,byProject.rows,"all matching requests for project");
         equal(0,byProject.problems,"successful project export");
+        StringWriter automaticOutput = new StringWriter();
+        List<String> automaticLog = new ArrayList<>();
+        Exporter automatic = new Exporter(portal,automaticOutput,"fixture-only",automaticLog::add);
+        automatic.runAll();
+        equal(8,automatic.rows,"automatic run covers both requests and every step without input CSV");
+        check(automaticLog.stream().anyMatch(s -> s.startsWith("Request 2 of 2:")),"automatic progress includes total");
+        equal(2,Exporter.matchingRequests(new Query(0,"","",Collections.emptySet()),Arrays.asList(requests.get(0),requests.get(0),requests.get(2))).size(),"automatic inventory deduplicates repeated requests");
+        rejects(() -> Exporter.matchingRequests(new Query(0,"","",Collections.emptySet()),Arrays.asList(map("projectid","240258"))));
+        List<Query> multipleProjects = queries("Ref No,Project ID\n,240258\n,240259\n");
+        equal(2,multipleProjects.size(),"multiple project IDs use separate rows, no Steps column");
+        check(multipleProjects.stream().allMatch(item -> item.acceptsStep("NT_IE_TK07")),"two-column input includes all steps");
         portal.cancel = true;
         try { byProject.run(q); throw new AssertionError("cancellation swallowed"); }
         catch (PromsBrowser.Cancelled expected) { checks++; }

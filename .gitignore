@@ -4,6 +4,7 @@
 /output/
 /Login.txt
 /input.csv
+/proms.properties
 /chromedriver.exe*
 /nbproject/private/
 *.log

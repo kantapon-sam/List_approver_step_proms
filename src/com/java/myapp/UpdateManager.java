@@ -64,14 +64,14 @@ final class UpdateManager {
     static Path stage(Path home,Release release,Consumer<String> status,Source source) throws IOException {
         Path updates=home.resolve(".updates"); safePath(home,updates); Files.createDirectories(updates);
         Path stage=Files.createTempDirectory(updates,"release-"+release.version+"-");
-        status.accept("กำลังดาวน์โหลดเวอร์ชัน "+release.version+"...");
+        status.accept("Downloading version "+release.version+"...");
         source.download(release.url,stage.resolve("release.zip"),release.size);
         verify(stage.resolve("release.zip"),release);
         UpdateInstaller.extract(stage.resolve("release.zip"),stage.resolve("incoming"),release.version);
         Properties p=new Properties(); p.setProperty("app.version",release.version); p.setProperty("archive.url",release.url);
         p.setProperty("archive.sha256",release.sha256); p.setProperty("archive.size",Long.toString(release.size));
         try (Writer writer=Files.newBufferedWriter(stage.resolve("update.properties"),StandardCharsets.UTF_8,StandardOpenOption.CREATE_NEW)) { p.store(writer,"Verified public release; no credentials"); }
-        status.accept("ตรวจสอบไฟล์เรียบร้อย กำลังเตรียมอัปเดต...");
+        status.accept("Files verified. Preparing the update...");
         return stage;
     }
     static void verify(Path archive,Release release) throws IOException {

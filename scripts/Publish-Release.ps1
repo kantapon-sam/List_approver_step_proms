@@ -29,11 +29,12 @@ try {
     }
     & (Join-Path $PSScriptRoot 'Package-Release.ps1')
     $archive = "release/List_approver_step_proms-$version.zip"
+    $portable = "release/List_approver_step_proms-$version-windows.zip"
     if (-not $exists) {
         gh release create $tag --repo $repo --target $Commit --title "List Approver Step PROMs $tag" --notes-file CHANGELOG.md --draft
         if ($LASTEXITCODE -ne 0) { throw 'Could not create release draft.' }
     }
-    gh release upload $tag $archive release/update.properties release/SHA256SUMS.txt --repo $repo --clobber
+    gh release upload $tag $archive $portable release/update.properties release/SHA256SUMS.txt --repo $repo --clobber
     if ($LASTEXITCODE -ne 0) { throw 'Release upload failed; draft remains unpublished.' }
     gh release edit $tag --repo $repo --draft=false --latest
     if ($LASTEXITCODE -ne 0) { throw 'Could not publish completed release.' }

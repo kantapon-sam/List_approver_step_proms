@@ -4,6 +4,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.*;
 
@@ -13,9 +14,15 @@ final class PromsBrowser implements Portal {
     private final Settings settings;
     private final BooleanSupplier cancelled;
     private final String script;
+    private final Consumer<String> log;
 
     PromsBrowser(WebDriver driver, Settings settings, BooleanSupplier cancelled) throws IOException {
+        this(driver,settings,cancelled,value -> { });
+    }
+
+    PromsBrowser(WebDriver driver, Settings settings, BooleanSupplier cancelled, Consumer<String> log) throws IOException {
         this.driver = driver; this.settings = settings; this.cancelled = cancelled;
+        this.log = log;
         try (InputStream in = getClass().getResourceAsStream("resources/dom.js")) {
             if (in == null) throw new IOException("DOM adapter resource is missing.");
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
@@ -53,7 +60,9 @@ final class PromsBrowser implements Portal {
         driver.get(settings.listUrl);
         WebElement input = waitFor().until(ExpectedConditions.elementToBeClickable(By.cssSelector(settings.searchCss)));
         settle();
-        input.clear(); input.sendKeys(value); input.sendKeys(Keys.ENTER);
+        input.clear();
+        if (!value.isEmpty()) input.sendKeys(value);
+        input.sendKeys(Keys.ENTER);
         settle();
         if (!value.equals(driver.findElement(By.cssSelector(settings.searchCss)).getAttribute("value")))
             throw new IllegalStateException("Search input did not retain the requested ID.");
@@ -67,6 +76,7 @@ final class PromsBrowser implements Portal {
             List<Map<String,String>> rows = snapshot(kind);
             if (!pages.add(rows.toString())) throw new IllegalStateException("Repeated " + kind + " page; export would be incomplete.");
             result.addAll(rows);
+            if (kind.equals("requests")) log.accept("Request page " + (page + 1) + ": " + result.size() + " rows read.");
             WebElement next = (WebElement) dom("next", kind, null);
             if (next == null) return result;
             click(next); settle();

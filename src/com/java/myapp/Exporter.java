@@ -41,6 +41,22 @@ final class Exporter {
         log.accept("Finished: " + rows + " CSV rows; " + problems + " rows need attention.");
     }
 
+    void runAll() throws IOException {
+        log.accept("Loading all visible requests from every page...");
+        portal.search("");
+        List<Map<String,String>> requests = matchingRequests(new Query(0,"","",Collections.emptySet()), portal.allRows("requests"));
+        log.accept("Found " + requests.size() + " requests. Reading every Activity/Milestone step.");
+        int record = 0;
+        for (Map<String,String> request : requests) {
+            record++;
+            String ref = get(request,"refno");
+            log.accept("Request " + record + " of " + requests.size() + ": Ref " + ref + " / Project " + projectId(request));
+            extractRequest(new Query(record,ref,projectId(request),Collections.emptySet()), request);
+        }
+        if (requests.isEmpty()) log.accept("No requests are visible in the configured list page.");
+        log.accept("Finished: " + requests.size() + " requests; " + rows + " CSV rows; " + problems + " rows need attention.");
+    }
+
     private void extractRequest(Query query, Map<String,String> request) throws IOException {
         List<Map<String,String>> steps;
         try {

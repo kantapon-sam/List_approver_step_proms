@@ -50,15 +50,16 @@ public final class BrowserFixtureTest {
             require(browser.allRows("requests").size()==3,"request pagination");
             StringWriter report = new StringWriter(); Csv.write(report,Exporter.HEADER);
             Exporter exporter = new Exporter(browser,report,"LOCAL FIXTURE ONLY",System.out::println);
-            exporter.run(ExportTest.queries("Ref No,Steps\n26070892,\n404,\n"));
+            exporter.runAll();
             List<List<String>> rows = Csv.parse(new StringReader(report.toString()));
-            require(exporter.rows==5,"four approvers plus not-found row");
-            require(exporter.problems==1,"not-found is only issue");
+            require(exporter.rows==12,"all three requests and both steps exported without CSV input");
+            require(exporter.problems==0,"automatic export has no issues");
             require(rows.get(1).get(8).equals("NT_IE_TK07"),"first step");
             require(rows.get(3).get(8).equals("NT_IE_TK08"),"second step from next page");
             require(rows.get(3).get(11).equals("NT_IE_TK08_TEST_1"),"no stale modal data");
             require(rows.get(2).get(13).isEmpty(),"pending date blank");
-            require(rows.get(5).get(14).equals("NOT_FOUND_IN_SCOPE"),"empty search result");
+            require(rows.size()==13,"header and all twelve approval rows");
+            require(rows.stream().skip(1).map(row -> row.get(3)).distinct().count()==3,"every request page included");
             require(((Number)((JavascriptExecutor)driver).executeScript("return window.writeActions")).intValue()==0,"no approve actions");
             // A missing Approval Line column must fail visibly rather than export shifted values.
             browser.openRequest("26070892");

@@ -20,5 +20,5 @@ final class AppInstance implements AutoCloseable {
         } catch (IOException | RuntimeException ex) { channel.close(); throw ex; }
     }
     public void close() throws IOException { try { lock.release(); } finally { channel.close(); } }
-    static final class Busy extends IOException { Busy() { super("โปรแกรมกำลังทำงานหรืออัปเดตอยู่ กรุณาปิดหน้าต่างเดิมก่อน / Application is already running."); } }
+    static final class Busy extends IOException { Busy() { super("The application is already running or updating. Close the existing window first."); } }
 }

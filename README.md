@@ -1,157 +1,120 @@
 # List Approver Step PROMs
 
-เริ่มเวอร์ชันที่เผยแพร่บน GitHub ใหม่จาก **1.0.0** โดยเลขรุ่นอ้างอิงจาก `version.properties` ที่เดียว
-ดาวน์โหลดได้จาก [GitHub Releases](https://github.com/kantapon-sam/List_approver_step_proms/releases/latest)
+A **Java 8** desktop application that reads every request visible in PROMs Pending Approval, opens every Activity/Milestone step, and exports its Approval Line to CSV.
 
-โปรแกรม Java 8 / NetBeans สำหรับอ่าน Activity/Milestone → Approval Line แล้วส่งออก CSV
-โดยใช้ Selenium และตัวตรวจ/อัปเดต ChromeDriver จาก `ApproveProms_TrueCorp_V3` เป็นฐาน
-โปรแกรมคลิกเฉพาะการค้นหา รายละเอียด Step และแท็บ Approval Line ไม่มีฟังก์ชันอนุมัติ/ปฏิเสธงาน
+## Download and start
 
-## เริ่มใช้งาน
+1. Open the [latest release](https://github.com/kantapon-sam/List_approver_step_proms/releases/latest) and download the asset ending in **-windows.zip**.
+2. Extract the whole ZIP to a writable folder. Keep `lib` beside `List_approver_step_proms.jar`.
+3. Double-click `List_approver_step_proms.jar` with Java 8. No CMD launcher is needed.
+4. Click **Read all approvals**. Chrome opens for sign-in.
+5. Sign in, including any OTP/CAPTCHA. The application reads all request pages, then all steps and all approval pages automatically.
+6. Click **Open output folder** to find the report. Progress shows the request-page count, total requests, and current request/step. **Stop** saves a clearly marked partial report.
 
-1. แตก ZIP ของ Release ลงโฟลเดอร์โปรแกรม แล้วดับเบิลคลิก **`List_approver_step_proms.jar`** ด้วย Java 8 ไม่ต้องใช้ CMD
-2. โปรแกรมสร้าง `Login.txt`, `input.csv`, `proms.properties` ให้ในครั้งแรก ใส่ User/Password ใน `Login.txt` และรายการใน `input.csv`
-3. เลือก CSV แล้วกด **เริ่มอ่านข้อมูล**
-4. โปรแกรมเปิด Chrome และกรอก User/Password ให้ จากนั้นกด **Sign in** และทำ OTP/CAPTCHA ด้วยตนเองถ้ามี (รอได้ 5 นาที)
-5. ผลลัพธ์อยู่ใน `output/approval_steps_YYYYMMDD_HHMMSS_SSS.csv` ข้าง JAR เปิดด้วย Excel ได้ รองรับภาษาไทย UTF-8 BOM
+**No Ref No, Project ID or Steps entry is required for the desktop workflow.** Multiple projects are handled automatically as their requests are read from the website.
 
-ใช้ **Java 8 เท่านั้น** ทั้ง build และ runtime พร้อม Google Chrome บน Windows ChromeDriver จะตรวจรุ่น/ดาวน์โหลดอัตโนมัติก่อนเปิด Chrome
-โปรแกรมใช้ Chrome session แยกและปิดเฉพาะ session ของตัวเองเมื่อจบงาน
-ไฟล์ `Login.txt`, `input.csv`, `proms.properties`, driver และ output จะอ้างจากโฟลเดอร์ JAR เสมอ แม้เปิดจาก working directory อื่น
-ปุ่มหยุดจะทำงานหลัง browser operation ที่กำลังรันสิ้นสุด (อาจรอถึง timeout) และบันทึก `CANCELLED` ในไฟล์ที่ทำได้บางส่วน
+## Login and local files
 
-## Login.txt
+The Windows ZIP contains actual filenames with no user data:
+
+| File | Initial contents | Purpose |
+| --- | --- | --- |
+| `Login.txt` | Blank User and Password entries | Optional sign-in prefill |
+| `input.csv` | `Ref No,Project ID` header only | Optional command-line lookup |
+| `proms.properties` | Empty | Optional settings; built-in defaults apply |
+
+To enable prefill, edit `Login.txt` locally:
 
 ```text
-User,your_username
-Password,your_password
+User,
+Password,
 ```
 
-ไฟล์ Login มีเฉพาะ `User` และ `Password` ไม่ต้องใส่ค่าอื่น
-รหัสผ่านที่มี comma หรือช่องว่างจะคงค่าเดิม ตรวจรูปแบบก่อนเปิด Chrome และไม่แสดงค่าบัญชีใน log หรือ CSV
-หากไม่มีไฟล์หรือเว้นทั้งสองค่าว่าง จะให้กรอกบนหน้าเว็บเอง หากใส่เพียงค่าเดียวจะแจ้งให้แก้ไขก่อนเริ่ม
-ไฟล์นี้เป็นข้อความธรรมดาสำหรับบัญชีของผู้ใช้ เก็บไว้นอก Git; การ build ไม่เขียนทับไฟล์ที่มีอยู่
+Enter your values after each comma, or leave both blank and sign in manually in Chrome. Only User and Password are read. There are no Search or Description fields. Password commas and spaces are preserved. The program does not automatically press Sign in.
 
-## อัปเดตโปรแกรม
+Real credentials, user input, settings, reports and logs are excluded from Git and release assets. Packaging uses the verified blank files in `defaults/`, never working files beside a local JAR. Keep your populated Login.txt private.
 
-- เมื่อเปิดโปรแกรมและทุก 30 นาที โปรแกรมตรวจ GitHub Release ใน background; ใช้งานต่อได้แม้ตรวจรุ่นไม่ได้
-- หน้าต่างแสดงรุ่นปัจจุบัน เมื่อมีรุ่นใหม่จะแสดงเลขรุ่นใหม่และปุ่ม **อัปเดตและเปิดใหม่** หรือกด **ตรวจเวอร์ชัน** ได้เอง
-- ต้องจบงานอ่าน PROMs ก่อนกดอัปเดต โปรแกรมดาวน์โหลด ZIP ตรวจ SHA-256 และ Java 8 แล้วปิดตัวเอง
-- ตัวติดตั้ง Java 8 แยก process จะรอโปรแกรมปิด สำรองไฟล์ ติดตั้ง แล้วเปิด JAR รุ่นใหม่ให้ โดยไม่ใช้ CMD
-- หากการแทนไฟล์ล้มเหลว จะพยายามคืนไฟล์รุ่นเดิม และเก็บข้อมูลกู้คืน/บันทึกไว้ใน `.updates`
-- `Login.txt`, `input.csv`, `proms.properties`, `output` และ ChromeDriver ไม่อยู่ในรายการไฟล์ที่ updater แก้ไข
-- แพ็กเกจ Release และ source ไม่มีบัญชี/รหัสผ่านจริง มีเฉพาะ `Login.example.txt` ที่เว้นค่าทั้งสองช่องว่าง
+## Scope and results
 
-Feed ใช้ [ลิงก์ดาวน์โหลด asset ของ Release ล่าสุด](https://docs.github.com/en/repositories/releasing-projects-on-github/linking-to-releases)
-ชื่อ `update.properties` จาก repository นี้โดยตรง จึงไม่ต้องแจก token GitHub ให้ผู้ใช้
+The default list is `https://proms.truecorp.co.th/proms/pendingapprove`. **Only requests visible to the signed-in account in that list are included.** Completed requests or projects outside that list may be absent. This is not a complete inventory of all PROMs projects.
 
-## Input CSV
+The application reads navigation and detail tables; it does not approve, reject or submit requests. It clears the list search, collects all pages, deduplicates exact reference numbers, and opens each request's Activity/Milestone and Approval Line pages.
+
+Reports use UTF-8 with a BOM for Excel, one row per approver per step. Columns include Ref No, Project ID, Project Name, Request Type, Requester, Step, Description, Approval Order, Approver, Status, Approved Date, Result, Message, Source URL and Extracted At. The leading Input columns identify the source-list row and its IDs in automatic mode, or the CSV query in command-line mode.
+
+Approved Date is preserved exactly as displayed, including blank values. Names and other website data retain their original language. Approval Order is the displayed row order, not an inferred authorization level. Extracted At uses Asia/Bangkok. Source URL identifies the list page because details may share the same URL. Text that Excel could interpret as a formula is escaped. Existing report files are never overwritten.
+
+| Result | Meaning |
+| --- | --- |
+| `OK` | Approval data was read successfully |
+| `NO_APPROVAL_ROWS` | Approval Line exists but is empty |
+| `NO_STEPS` | Activity/Milestone exists but has no steps |
+| `NOT_FOUND_IN_SCOPE` | An optional CSV ID has no exact match in this list |
+| `STEP_NOT_FOUND` | A legacy CSV step filter has no matching step |
+| `READ_ERROR` | A request or step could not be read; see Message |
+| `RUN_ERROR` / `CANCELLED` | The run stopped early; the report may be partial |
+
+If the list is empty, the application logs that no requests are visible and writes a header-only report. Unexpected table headings or incomplete pagination produce an error rather than guessed columns.
+
+Live extraction has not yet been verified against the current PROMs website. Automated browser tests use a local synthetic portal to check all-request discovery, pagination, step navigation, approval extraction and read-only behavior.
+
+## Updates
+
+The application checks the public GitHub release feed on startup and every 30 minutes. Click **Check for updates** to check immediately. A newer version displays **Update and restart**; finish or stop the current export before updating.
+
+The updater verifies the downloaded ZIP's size, SHA-256 and Java 8 bytecode, then uses a separate Java 8 process to wait for shutdown, back up application files, install and restart the JAR. If installation fails, it attempts rollback and keeps recovery information under `.updates`. No CMD launcher or GitHub token is needed by users.
+
+Updates preserve Login.txt, input.csv, proms.properties, reports and ChromeDriver. Missing local configuration files are created with blank defaults. Exact, untouched copies of the old v1.0.0 example templates are removed on startup; edited or locked files are preserved.
+
+The canonical ZIP without `-windows` is for the updater and contains only application files, keeping compatibility with v1.0.0. New users should download **-windows.zip**, which also contains the blank real-name configuration files. Both packages contain the same application version.
+
+## Optional command-line input
+
+The normal desktop workflow does not read input.csv. For a restricted command-line lookup, its only required columns are:
 
 ```csv
-Ref No,Project ID,Steps
-26070892,,
-26070892,,TK07
-,240258,TK07;TK08
+Ref No,Project ID
 ```
 
-ตัวอย่างด้านบนแสดง 3 รูปแบบ เลือกใช้เฉพาะแถวที่ต้องการเพื่อไม่ให้ได้ผลซ้ำ
-
-- `Ref No`: ค้นเลข Request No./Ref No. แบบตรงตัว
-- `Project ID`: รวบรวมทุก Request ที่มี Project ID ตรงกันจากทุกหน้าของรายการที่ตั้งค่าไว้ รองรับคอลัมน์ Project ID หรือรูปแบบ `240258 : ชื่อโครงการ` ใน Project Name
-- หากกรอกทั้งสองช่อง จะต้องตรงทั้ง Ref No และ Project ID
-- `Steps`: เว้นว่างหรือ `*` เพื่ออ่านทุก Step; ใช้ `TK07` หรือชื่อเต็ม `NT_IE_TK07`; หลาย Step คั่นด้วย `;` หรือ `|`
-- ID เก็บเป็นข้อความ ตั้งคอลัมน์ใน Excel เป็น Text ก่อนกรอก หากมีเลขศูนย์นำหน้า
-- ต้องมี header; รองรับชื่อ `RefNo`, `Request No.`, `ProjectID`, `Step` ด้วย
-- ไม่รับคอลัมน์ไม่รู้จัก จำนวนช่องไม่ครบ หรือ CSV ที่ quote ผิดรูปแบบ โดยตรวจทั้งหมดก่อนเปิด Chrome
-
-## Output CSV
-
-หนึ่งแถวต่อผู้อนุมัติต่อ Step พร้อม `Input Row`, `Input Ref No`, `Input Project ID`, `Ref No`,
-`Project ID`, `Project Name`, `Request Type`, `Requester`, `Step`, `Description`, `Approval Order`,
-`Approver`, `Status`, `Approved Date`, `Result`, `Message`, `Source URL`, `Extracted At`
-
-`Approved Date` เก็บตามข้อความต้นฉบับ ไม่แปลง พ.ศ./ค.ศ. หรือ timezone หากยังว่างจะคงว่าง
-`Approval Order` คืออันดับแถวที่อ่านจากตารางขณะส่งออก ไม่อนุมานเป็นลำดับสิทธิ์การอนุมัติ
-`Extracted At` ใช้เวลา Asia/Bangkok ส่วน `Source URL` เป็นหน้ารายการ เพราะรายละเอียดอาจเปิดใน modal บน URL เดิม
-ข้อความที่ Excel อาจตีความเป็นสูตรจะเติม `'` นำหน้า ไม่มีการเขียนทับไฟล์รายงานเดิม และ flush ทุกแถว
-
-| Result | ความหมาย |
-| --- | --- |
-| `OK` | อ่านข้อมูลผู้อนุมัติสำเร็จ |
-| `NO_APPROVAL_ROWS` | พบตาราง Approval Line แต่ตารางไม่มีแถวข้อมูล |
-| `NOT_FOUND_IN_SCOPE` | ไม่พบ ID ตรงตัวในหน้ารายการที่ตั้งค่าไว้ |
-| `STEP_NOT_FOUND` | ไม่พบ Step ที่ระบุ บันทึกแยกสำหรับแต่ละ Step ที่ขาด |
-| `NO_STEPS` | พบตาราง Activity/Milestone แต่ไม่มี Step |
-| `READ_ERROR` | อ่านรายการ/Step ไม่สำเร็จ ดู Message; โปรแกรมทำรายการถัดไปต่อ |
-| `RUN_ERROR` / `CANCELLED` | งานหยุดก่อนเสร็จ ไฟล์อาจมีข้อมูลเพียงบางส่วน |
-
-## ขอบเขตและสถานะการยืนยัน
-
-ค่าเริ่มต้นค้นที่ `https://proms.truecorp.co.th/proms/pendingapprove` ตามโปรเจกต์อ้างอิงและภาพตัวอย่าง
-**Pending Approval ไม่ใช่รายการงานทั้งหมดของ PROMs** ผลจึงจำกัดด้วยสิทธิ์บัญชีและรายการที่หน้าเว็บนี้แสดง
-ข้อมูลที่อนุมัติเสร็จแล้วหรือไม่อยู่ในคิวอาจค้นไม่พบ ไม่ควรตีความว่าไม่มีโครงการนั้นในระบบ
-
-สามารถเปลี่ยน `list.url` และ `search.css` ใน `proms.properties` ไปยังหน้ารายการ PROMs ที่ตรวจสอบแล้วว่าใช้
-คอลัมน์และรายละเอียดแบบเดียวกันได้ แต่ยังไม่ได้ยืนยัน workflow ของหน้า Project/Work Order อื่น
-
-เวอร์ชันนี้พัฒนาจาก source ของโปรเจกต์เดิมและภาพตัวอย่าง ยังไม่ได้ยืนยันกับรายการจริง `26070892`
-เพราะเครื่องมือควบคุม Chrome ไม่สามารถยืนยัน URL ของหน้าต่าง Windows และหยุดการตรวจหน้าเว็บ
-การค้น/เปิด Activity มีหลักฐานจาก source เดิม ส่วนการจับตาราง Approval Line ใช้ชื่อหัวคอลัมน์
-`Approver`, `Status`, `Approved Date` ตามคำขอ ต้องยืนยันกับ DOM จริงเมื่อทดสอบหลัง login
-หากหัวคอลัมน์หรือ pagination ไม่ตรง โปรแกรมจะรายงานข้อผิดพลาดแทนการเดาตำแหน่งคอลัมน์
-
-## CLI
-
-รันจากโฟลเดอร์ `dist`:
+Enter either Ref No or Project ID on each row. Multiple IDs go on separate rows. If both are present, both must match. A Project ID expands to every matching request in the configured list. All steps are read automatically; there is no Steps column in the supplied input file. Keep IDs as text in Excel to preserve leading zeroes. Legacy three-column CSV files remain readable for compatibility.
 
 ```text
+java -jar List_approver_step_proms.jar --all
+java -jar List_approver_step_proms.jar --input input.csv
 java -jar List_approver_step_proms.jar --check-input --input input.csv
 java -jar List_approver_step_proms.jar --check-login
 java -jar List_approver_step_proms.jar --check-update
-java -jar List_approver_step_proms.jar --input input.csv --output output/my-report.csv
-java -jar List_approver_step_proms.jar --check-driver
 java -jar List_approver_step_proms.jar --version
 ```
 
-Exit code: `0` เสร็จสมบูรณ์, `1` งานล้มเหลว, `2` มีแถวที่ต้องตรวจสอบ, `130` ผู้ใช้หยุดงาน
-หากรันจาก NetBeans ค่า input/config/output จะอ้างจาก project working directory
+Use `--output path/report.csv` to choose an output file or `--config path/proms.properties` for settings. `--all` and `--input` are mutually exclusive. Exit codes: 0 complete, 1 failed, 2 unresolved records, 130 stopped. An untouched header-only input.csv needs at least one ID before using optional CSV mode.
 
-## Build และทดสอบ
+## Optional settings
 
-เปิดโปรเจกต์นี้ใน NetBeans โดยเลือก JDK 8 หรือรันสคริปต์สำหรับนักพัฒนา:
+An empty proms.properties uses these defaults. Add only the keys you need to override:
+
+```properties
+list.url=https://proms.truecorp.co.th/proms/pendingapprove
+search.css=#txtSearch
+timeout.seconds=45
+login.seconds=300
+quiet.millis=1800
+max.pages=2000
+```
+
+Another PROMs list URL must expose the same headings and detail navigation; other Project/Work Order pages have not been verified. ChromeDriver is checked automatically against the local Chrome version and downloaded from the official source when needed.
+
+## Build and release
+
+Use JDK 8 only, including for tests and the update helper. Other Java versions are rejected.
 
 ```powershell
-./scripts/Build.ps1 -JavaHome 'C:\path\to\jdk8'
+./scripts/Build.ps1 -JavaHome 'C:\Program Files\OpenJDK\jdk-8.0.292.10-hotspot'
 ./scripts/Package-Release.ps1
 ```
 
-สคริปต์ดาวน์โหลด Ant และ dependencies ตาม URL/ตรวจ SHA-256 ใน `dependencies.lock.json` แล้วรัน `ant test jar` ด้วย **JDK 8 เท่านั้น**
-build จะปฏิเสธ JDK เวอร์ชันอื่น และ runtime จะปฏิเสธ Java เวอร์ชันอื่น
-ใช้ `scripts/Prepare-Libraries.ps1` เมื่อต้องตั้งค่า libraries ให้ NetBeans แยกต่างหาก
-ชุด `ant test` เป็นการทดสอบ offline: CSV quoting/BOM/ภาษาไทย, exact matching, Project ID expansion,
-all/selected steps, pending dates, error continuation, cancellation, Login.txt parsing, driver update/recovery
-และ updater รวมทดสอบ process ติดตั้ง/เปิดใหม่จริงด้วยโปรแกรมจำลอง การ rollback และการคงข้อมูลผู้ใช้
-ไม่มีการเชื่อมต่อหรือเปลี่ยนแปลงข้อมูลใน PROMs
+The build downloads pinned Ant/dependencies with SHA-256 verification. Offline tests cover CSV handling, exact matching, automatic extraction, partial errors, default-file preservation, ChromeDriver updates and updater handoff/rollback/restart. To include the headless local browser fixture, add `-FixtureDriver 'path\to\chromedriver.exe'` to Build.ps1. Tests do not connect to PROMs.
 
-ทดสอบ DOM ด้วย Chrome แบบ headless บน localhost fixture (ข้อมูลสมมติเท่านั้น):
+For a new release, update version.properties and CHANGELOG, validate, then commit and push to main. GitHub Actions builds/tests with Java 8 and publishes the two ZIPs, update.properties and SHA256SUMS.txt. Assets are uploaded to a draft before it becomes latest. Published releases are never overwritten; bump the version for each change. Verify the remote commit, assets and live update feed before announcing availability.
 
-```text
-ant test-fixture -Dfixture.driver="C:\path\to\chromedriver.exe"
-```
-
-fixture ตรวจการกรอก User/Password ด้วยบัญชีสมมติและรอให้ผู้ใช้กด Sign in, การแบ่งหน้าทั้ง Request/Step/Approval, การโหลดข้อมูลแบบ asynchronous,
-การสลับ Step โดยไม่อ่าน modal เก่า, วันที่ว่าง และการปฏิเสธตารางที่หัวคอลัมน์เปลี่ยน
-การทดสอบนี้ผ่านแล้วบนเครื่องนี้ แต่ไม่ทดแทนการทดสอบกับ DOM ของ PROMs จริง
-
-## ออก Release รุ่นถัดไป
-
-1. แก้ source พร้อมทดสอบ แล้วเพิ่มเลข `app.version` ใน `version.properties` เช่น `1.0.1` และบันทึก CHANGELOG
-2. Commit และ push เข้า `main`; GitHub Actions จะ build/test ด้วย Java 8 แล้วออก tag/Release และแนบ ZIP, `update.properties`, `SHA256SUMS.txt` อัตโนมัติ
-3. Workflow อัปโหลดไฟล์เข้า draft ให้ครบก่อนเผยแพร่เป็น latest; รุ่นที่เผยแพร่แล้วจะไม่ถูกเขียนทับ ให้เพิ่มเลขรุ่นใหม่เสมอ
-4. ผู้ใช้จะเห็นรุ่นใหม่จาก feed เดียวกันและกดอัปเดตได้
-
-สั่งเผยแพร่ด้วยตนเองหลัง commit/build ได้ผ่าน `scripts/Publish-Release.ps1` โดยใช้ GitHub CLI ที่ยืนยันตัวตนแล้วหรือ Git credential helper ของเครื่อง
-ไม่มีการบันทึก token ลงไฟล์ การตรวจ credential helper ใช้ข้อมูลใน memory เฉพาะ process ที่เผยแพร่
-
-ไฟล์ `input.csv`, `Login.txt`, `output`, `.updates`, `build`, `dist`, `release`, driver และ binary libraries ถูกกันออกจาก Git
-การจัด ZIP ใช้รายการไฟล์ที่อนุญาตโดยตรง ไม่รวมโฟลเดอร์ dist ทั้งก้อน และตรวจว่า template Login ภายนอก/ภายใน JAR เป็นค่าว่าง
+Authorized maintainers can also run scripts/Publish-Release.ps1 after a clean committed build. It uses GitHub CLI or the normal Git credential helper in memory; credentials are never written to source or release files.
