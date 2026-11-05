@@ -112,10 +112,9 @@ final class Exporter {
             List<String> values = Arrays.asList(get(request,"refno"),projectId(request),stepLabel,get(approval,"approver"),get(approval,"status"),get(approval,"approveddate"));
             Csv.write(writer, values);
             rows++;
-            observer.row(values);
         }
         if (!result.equals("OK")) {
-            if (!result.equals("NO_APPROVAL_ROWS")) { problems++; observer.issue(); }
+            if (!result.equals("NO_APPROVAL_ROWS")) problems++;
             log.accept("  " + result + " | Input " + q.record + " / Ref " + (get(request,"refno").isEmpty() ? q.ref : get(request,"refno"))
                 + " / Project " + (projectId(request).isEmpty() ? q.project : projectId(request)) + " / Step " + get(step,"step") + ": " + message);
         }

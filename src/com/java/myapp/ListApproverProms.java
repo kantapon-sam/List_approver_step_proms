@@ -108,7 +108,7 @@ public final class ListApproverProms {
     private static void usage() {
         System.out.println("List Approver Step PROMs " + VERSION + "\n"
             + "Double-click the JAR with Java 8 for the desktop window.\n"
-            + "Enter Ref No or Project ID in input.csv, then click Read input CSV. Steps are read automatically.\n"
+            + "Enter Ref No or Project ID in input.csv, then click Run. Steps are read automatically.\n"
             + "Each ID is searched directly. Project ID lookups include every matching filtered results page.\n"
             + "java -jar List_approver_step_proms.jar --input input.csv [--output output/report.csv] [--config proms.properties]\n"
             + "Options: --check-input, --check-login, --check-driver, --check-update, --version, --help\n"
@@ -171,7 +171,7 @@ public final class ListApproverProms {
             }
         } finally {
             if (driver != null) try { driver.quit(); } catch (RuntimeException ignored) { log.accept("The automation Chrome session could not be closed."); }
-            log.accept("Browser work finished. Results remain in the application window.");
+            log.accept("Browser work finished. Run status remains in the application window. Open CSV for approval details.");
         }
     }
 

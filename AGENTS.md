@@ -11,3 +11,4 @@
 - Verify the remote commit, the published release assets and the live update feed before claiming that a release is available to users.
 - Keep only one Desktop installation at Program Automation WEB/List_approver_step_proms. Update it in place, preserve its user files, and do not create version-named Desktop folders or copy release ZIPs onto the Desktop. The user will handle further deletion of old copies.
 - Export only the report CSV; show extraction logs in the application instead of creating .csv.log files. Report filenames include date/time to seconds, without milliseconds.
+- Show only run progress/status in the desktop window, including input position and current Ref/Step. Do not preview approval rows or show approval-status counters; users open the CSV for those details.

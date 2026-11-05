@@ -1,5 +1,13 @@
 # Releases
 
+## 1.0.4
+
+- Simplify the desktop window to run progress and status, including input position and the current Ref/Step. Remove the Results table and all approval-status counters.
+- Rename Read input CSV to Run. Keep Open CSV and Open output folder for viewing report details.
+- Show completion, partial-run errors and cancellation in the same window. Notify once with a dialog after a failed or incomplete run, restoring the window if minimized; do not interrupt individual steps or show dialogs for successful runs or user-requested stops.
+- Locate the latest CSV for Open CSV without reading or displaying its contents.
+- Preserve the existing six-column CSV, all approval statuses, background extraction, Java 8 compatibility and user files during updates.
+
 ## 1.0.3
 
 - Open Chrome for manual sign-in, then continue extraction in a verified background browser session. Transfer authentication in memory only.

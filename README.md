@@ -8,12 +8,14 @@ A **Java 8** desktop application that searches PROMs Pending Approval by the Ref
 2. Extract the whole ZIP to a writable folder. Keep `lib` beside `List_approver_step_proms.jar`.
 3. Double-click `List_approver_step_proms.jar` with Java 8. No CMD launcher is needed.
 4. Fill in input.csv with Ref No or Project ID, one ID per row, and save it. Click **Choose CSV** if the file is in another folder.
-5. Click **Read input CSV** and sign in to Chrome, including any OTP/CAPTCHA. After sign-in, the program verifies a separate background session and closes the login browser. Each input ID is searched directly. A Ref No found on the first filtered page is processed immediately; Project IDs include all matching filtered result pages. Every step and approval page is read automatically.
-6. Follow the current input and step, row counts, **Results** table and **Run log** in the application window. The background browser closes when the run ends; this window stays open. Click **Open CSV** or **Open output folder**, or start another run. **Stop** keeps a clearly marked partial report.
+5. Click **Run** and sign in to Chrome, including any OTP/CAPTCHA. After sign-in, the program verifies a separate background session and closes the login browser. Each input ID is searched directly. A Ref No found on the first filtered page is processed immediately; Project IDs include all matching filtered result pages. Every step and approval page is read automatically.
+6. Follow the input position, current Ref/Step and **Run status** in the application window. The background browser closes when the run ends; this window stays open. Click **Open CSV** to view approval details or **Open output folder** to find reports. **Stop** keeps a clearly marked partial report.
 
 Keep one installation folder and update it in place using **Update and restart**. There is no need to extract another version folder or keep release ZIPs beside the installed application. Updates preserve your input, login, settings and reports.
 
-The Results table previews up to 1,000 rows; the CSV and counters include every exported row. Counts distinguish Approved, Waiting, empty approval lines and other statuses. On startup, the window previews the most recent saved CSV. Run logs are shown only in the current application session, so a saved CSV preview does not establish whether its run completed.
+The window shows operation progress and errors only. It does not display approval rows, names or approval-status counters. On startup, **Open CSV** links to the most recent report without loading its contents. Run messages are available only in the current application session.
+
+If a connection or page read fails, **Run status** shows the error and affected input/Ref/Step. The application can continue with later items when possible and finishes as **Completed with issues**; a run-level failure shows **Run failed**. Already-written CSV rows remain available, but the report may be partial. If failure occurs before extraction starts, no CSV is created. After browser cleanup, one dialog reports a failed or incomplete run and restores the window if minimized. It does not interrupt each failed step. Successful runs and user-requested stops do not show a completion dialog. Invalid input or local settings are reported in a dialog before the run begins.
 
 **There is no Steps column to fill in.** Enter multiple Ref No / Project ID values on separate rows. The program searches only those IDs and reads their steps from the website; it does not scan the full unfiltered request list.
 
@@ -46,7 +48,7 @@ The default list is `https://proms.truecorp.co.th/proms/pendingapprove`. **Only 
 
 The application reads navigation and detail tables; it does not approve, reject or submit requests. It searches each input ID, matches IDs exactly, deduplicates reference numbers within a query, and opens each matching request's Activity/Milestone and Approval Line pages. Request pagination is limited to filtered searches: all pages for Project IDs, or fallback pages if an exact Ref No is not on the first page. Empty searches are rejected.
 
-Reports use UTF-8 with a BOM for Excel and exactly six columns: **Ref No, Project ID, Step, Approver, Status, Approved Date**. Step identifies TK07, TK08, etc.; other step codes retain their original name. Each approval record from every step is included. Progress and diagnostic messages appear in **Run log** (or the console for command-line runs); no companion log file is created. The application opens each Ref No once and finishes all of its steps before moving to the next request.
+Reports use UTF-8 with a BOM for Excel and exactly six columns: **Ref No, Project ID, Step, Approver, Status, Approved Date**. Step identifies TK07, TK08, etc.; other step codes retain their original name. Each approval record from every step is included. Progress and diagnostic messages appear in **Run status** (or the console for command-line runs); no companion log file is created. The application opens each Ref No once and finishes all of its steps before moving to the next request.
 
 Approved Date is preserved exactly as displayed, including blank values. Names and status text retain their original language. Text that Excel could interpret as a formula is escaped. Report names use `approval_steps_YYYYMMDD_HHMMSS.csv`, without milliseconds. CSV creation begins after the background session is ready. Existing files are never overwritten.
 
@@ -62,9 +64,9 @@ The log records these diagnostics. The CSV includes every approval status, inclu
 | `READ_ERROR` | A request or step could not be read; see Message |
 | `RUN_ERROR` / `CANCELLED` | The run stopped early; the report may be partial |
 
-If a search has no matching requests, Run log shows NOT_FOUND_IN_SCOPE for that input row. Unexpected table headings or incomplete pagination produce a visible error rather than guessed columns. A cancelled or failed run can leave a partial CSV; check Run log and the completion message before closing the application.
+If a search has no matching requests, Run status shows NOT_FOUND_IN_SCOPE for that input row. Unexpected table headings or incomplete pagination produce a visible error rather than guessed columns. A cancelled or failed run can leave a partial CSV; check Run status and the completion message before closing the application.
 
-Automated browser tests use a local synthetic portal to check two direct input references without request-page clicks, filtered Project ID pagination, step navigation, approval extraction and read-only behavior. Version 1.0.3 was also verified read-only with two user-provided live inputs in background mode, including approved records, waiting approvals and empty approval lines, without extraction errors. The automation browsers closed after completion while the results window stayed open. Other projects and page layouts may differ; Run log reports any unsupported table structure.
+Automated browser tests use a local synthetic portal to check two direct input references without request-page clicks, filtered Project ID pagination, step navigation, approval extraction and read-only behavior. Version 1.0.3 was also verified read-only with two user-provided live inputs in background mode, including approved records, waiting approvals and empty approval lines, without extraction errors. The automation browsers closed after completion while the results window stayed open. Other projects and page layouts may differ; Run status reports any unsupported table structure.
 
 ## Updates
 
@@ -120,7 +122,7 @@ Use JDK 8 only, including for tests and the update helper. Other Java versions a
 ./scripts/Package-Release.ps1
 ```
 
-The build downloads pinned Ant/dependencies with SHA-256 verification. Offline tests cover CSV handling, exact matching, automatic extraction, partial errors, report summaries, default-file preservation, ChromeDriver updates and updater handoff/rollback/restart. To include the headless local browser fixtures, add `-FixtureDriver 'path\to\chromedriver.exe'` to Build.ps1. These also verify authenticated session transfer, browser cleanup and cancellation using synthetic cookies and storage. Tests do not connect to PROMs.
+The build downloads pinned Ant/dependencies with SHA-256 verification. Offline tests cover CSV handling, exact matching, automatic extraction, partial errors, default-file preservation, ChromeDriver updates and updater handoff/rollback/restart. To include the headless local browser fixtures, add `-FixtureDriver 'path\to\chromedriver.exe'` to Build.ps1. These also verify authenticated session transfer, browser cleanup and cancellation using synthetic cookies and storage. Tests do not connect to PROMs.
 
 For a new release, update version.properties and CHANGELOG, validate, then commit and push to main. GitHub Actions builds/tests with Java 8 and publishes the two ZIPs, update.properties and SHA256SUMS.txt. Assets are uploaded to a draft before it becomes latest. Published releases are never overwritten; bump the version for each change. Verify the remote commit, assets and live update feed before announcing availability.
 
