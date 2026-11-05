@@ -1,15 +1,11 @@
 package com.java.myapp;
 
 import java.io.*;
-import java.time.*;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Consumer;
 
 final class Exporter {
-    static final List<String> HEADER = Arrays.asList("Input Row", "Input Ref No", "Input Project ID",
-        "Ref No", "Project ID", "Project Name", "Request Type", "Requester", "Step", "Description",
-        "Approval Order", "Approver", "Status", "Approved Date", "Result", "Message", "Source URL", "Extracted At");
+    static final List<String> HEADER = Arrays.asList("Ref No", "Project ID", "Step", "Approver", "Status", "Approved Date");
     private final Portal portal;
     private final Writer writer;
     private final String source;
@@ -21,12 +17,16 @@ final class Exporter {
     }
 
     void run(List<Query> queries) throws IOException {
+        int completed = 0;
         for (Query query : queries) {
-            log.accept("Input record " + query.record + ": searching " + query.search());
+            log.accept("Search " + (++completed) + " of " + queries.size() + ": "
+                + (query.ref.isEmpty() ? "Project ID " : "Ref No ") + query.search());
             List<Map<String,String>> requests;
             try {
                 portal.search(query.search());
-                requests = matchingRequests(query, portal.allRows("requests"));
+                // A direct Ref No match needs no request pagination. Project IDs may span filtered pages.
+                requests = query.ref.isEmpty() ? Collections.emptyList() : matchingRequests(query, portal.currentRows("requests"));
+                if (requests.isEmpty()) requests = matchingRequests(query, portal.allRows("requests"));
             } catch (PromsBrowser.Cancelled ex) { throw ex; }
             catch (RuntimeException ex) {
                 emit(query, empty(), empty(), empty(), "", "READ_ERROR", message(ex)); continue;
@@ -38,23 +38,7 @@ final class Exporter {
             }
             for (Map<String,String> request : requests) extractRequest(query, request);
         }
-        log.accept("Finished: " + rows + " CSV rows; " + problems + " rows need attention.");
-    }
-
-    void runAll() throws IOException {
-        log.accept("Loading all visible requests from every page...");
-        portal.search("");
-        List<Map<String,String>> requests = matchingRequests(new Query(0,"","",Collections.emptySet()), portal.allRows("requests"));
-        log.accept("Found " + requests.size() + " requests. Reading every Activity/Milestone step.");
-        int record = 0;
-        for (Map<String,String> request : requests) {
-            record++;
-            String ref = get(request,"refno");
-            log.accept("Request " + record + " of " + requests.size() + ": Ref " + ref + " / Project " + projectId(request));
-            extractRequest(new Query(record,ref,projectId(request),Collections.emptySet()), request);
-        }
-        if (requests.isEmpty()) log.accept("No requests are visible in the configured list page.");
-        log.accept("Finished: " + requests.size() + " requests; " + rows + " CSV rows; " + problems + " rows need attention.");
+        log.accept("Finished: " + rows + " CSV rows; " + problems + " issues. See this log for details.");
     }
 
     private void extractRequest(Query query, Map<String,String> request) throws IOException {
@@ -81,8 +65,6 @@ final class Exporter {
             log.accept("  Ref " + get(request,"refno") + " / " + get(step,"step") + " / Approval Line");
             List<Map<String,String>> approvals;
             try {
-                // Reload the exact request for each step, so a previous modal can never supply stale approvers.
-                portal.openRequest(get(request,"refno"));
                 approvals = portal.approvals(get(step,"step"));
                 for (Map<String,String> approval : approvals) {
                     if (!approval.containsKey("approver") || !approval.containsKey("status") || !approval.containsKey("approveddate"))
@@ -117,12 +99,16 @@ final class Exporter {
 
     private void emit(Query q, Map<String,String> request, Map<String,String> step, Map<String,String> approval,
             String order, String result, String message) throws IOException {
-        Csv.write(writer, Arrays.asList(""+q.record,q.ref,q.project,get(request,"refno"),projectId(request),
-            get(request,"projectname"),get(request,"requesttype"),get(request,"requester"),get(step,"step"),
-            get(step,"description"),order,get(approval,"approver"),get(approval,"status"),get(approval,"approveddate"),
-            result,message,source,OffsetDateTime.now(ZoneId.of("Asia/Bangkok")).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)));
-        rows++;
-        if (!result.equals("OK") && !result.equals("NO_APPROVAL_ROWS")) { problems++; log.accept("  " + result + ": " + message); }
+        if (result.equals("OK") || result.equals("NO_APPROVAL_ROWS")) {
+            String stepLabel = get(step,"step").replaceFirst("^.*_(TK[0-9]+)$", "$1");
+            Csv.write(writer, Arrays.asList(get(request,"refno"),projectId(request),stepLabel,get(approval,"approver"),get(approval,"status"),get(approval,"approveddate")));
+            rows++;
+        }
+        if (!result.equals("OK")) {
+            if (!result.equals("NO_APPROVAL_ROWS")) problems++;
+            log.accept("  " + result + " | Input " + q.record + " / Ref " + (get(request,"refno").isEmpty() ? q.ref : get(request,"refno"))
+                + " / Project " + (projectId(request).isEmpty() ? q.project : projectId(request)) + " / Step " + get(step,"step") + ": " + message);
+        }
     }
 
     private static Map<String,String> empty() { return Collections.emptyMap(); }

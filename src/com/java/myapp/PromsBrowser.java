@@ -57,6 +57,7 @@ final class PromsBrowser implements Portal {
 
     public void search(String value) {
         checkCancelled();
+        if (value == null || value.trim().isEmpty()) throw new IllegalArgumentException("Enter a Ref No or Project ID before searching.");
         driver.get(settings.listUrl);
         WebElement input = waitFor().until(ExpectedConditions.elementToBeClickable(By.cssSelector(settings.searchCss)));
         settle();
@@ -76,7 +77,7 @@ final class PromsBrowser implements Portal {
             List<Map<String,String>> rows = snapshot(kind);
             if (!pages.add(rows.toString())) throw new IllegalStateException("Repeated " + kind + " page; export would be incomplete.");
             result.addAll(rows);
-            if (kind.equals("requests")) log.accept("Request page " + (page + 1) + ": " + result.size() + " rows read.");
+            if (kind.equals("requests")) log.accept("Filtered results page " + (page + 1) + ": " + result.size() + " rows read.");
             WebElement next = (WebElement) dom("next", kind, null);
             if (next == null) return result;
             click(next); settle();
@@ -84,8 +85,11 @@ final class PromsBrowser implements Portal {
         throw new IllegalStateException("Reached max.pages for " + kind + "; export would be incomplete.");
     }
 
+    public List<Map<String,String>> currentRows(String kind) { return snapshot(kind); }
+
     public void openRequest(String ref) {
-        search(ref);
+        closeStepDialog();
+        if (!Boolean.TRUE.equals(dom("exists", "requests", null)) || dom("link", "requests", ref) == null) search(ref);
         openPagedLink("requests", ref);
         waitFor().until(d -> dom("section", null, null) != null || Boolean.TRUE.equals(dom("exists", "steps", null)));
         if (!Boolean.TRUE.equals(dom("exists", "steps", null))) {
@@ -95,11 +99,24 @@ final class PromsBrowser implements Portal {
     }
 
     public List<Map<String,String>> approvals(String step) {
+        closeStepDialog();
+        if (dom("link", "steps", step) == null) {
+            WebElement first = (WebElement)dom("first", "steps", null);
+            if (first != null) { click(first); settle(); }
+        }
         openPagedLink("steps", step);
         WebElement tab = waitFor().until(d -> (WebElement) dom("approvalTab", null, null));
         click(tab); settle();
         requireTable("approvals");
         return allRows("approvals");
+    }
+
+    private void closeStepDialog() {
+        if (!Boolean.TRUE.equals(dom("hasStepDialog", null, null))) return;
+        WebElement close = (WebElement)dom("closeStepDialog", null, null);
+        if (close == null) throw new IllegalStateException("Cannot locate the Close control for the previous step dialog.");
+        click(close); settle();
+        waitFor().until(d -> !Boolean.TRUE.equals(dom("hasStepDialog", null, null)));
     }
 
     private void openPagedLink(String kind, String value) {

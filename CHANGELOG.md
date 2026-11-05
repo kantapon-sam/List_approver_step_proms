@@ -1,5 +1,21 @@
 # Releases
 
+## 1.0.2
+
+Download **List_approver_step_proms-1.0.2-windows.zip** for a new installation, or use **Update and restart** in the existing application.
+
+- Read the Ref No / Project ID rows from input.csv and search each ID directly. Remove the unfiltered scan of all Pending Approval pages.
+- A Ref No found on the first filtered page is processed immediately without clicking request pagination. Project ID lookups include every matching filtered page.
+- Read every Activity/Milestone step automatically; the supplied input still has only Ref No and Project ID columns.
+- Open each Ref No once and finish all its steps before moving to the next request; close step dialogs and navigate step pages without searching the same Ref again.
+- Export exactly six columns: Ref No, Project ID, Step, Approver, Status, Approved Date. Use TK07/TK08 labels for TK steps and keep empty-table notices and errors in a companion log.
+- Support grouped approvers whose sequence cells span multiple table rows, as found in the live TK10 approval table.
+- Include all approval statuses and preserve blank dates for unapproved records. Keep steps with empty Approval Lines as rows with blank approver/status/date fields.
+- Show the selected CSV and progress for each input ID in the English desktop window.
+- Preserve existing Login.txt, input.csv, proms.properties and reports during updates. Blank templates are used only for missing files and new installations.
+- Verify two input references, exclusion of a similar unrelated reference, zero request-page clicks for direct matches, and complete step/approval pagination using the local browser fixture.
+- Live read-only validation with user-provided inputs confirmed approved records, waiting approvals and empty approval lines without extraction errors. No credentials or live report data are included in the release.
+
 ## 1.0.1
 
 For a new installation, download **List_approver_step_proms-1.0.1-windows.zip**, extract it and double-click the JAR with Java 8. Existing users can click the update button in the application.

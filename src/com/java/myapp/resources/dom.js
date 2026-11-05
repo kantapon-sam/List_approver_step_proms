@@ -45,7 +45,7 @@ function table(type) {
     return matches.length ? matches[0] : null;
 }
 function rows(t) {
-    var names = columns(t), result = [];
+    var names = columns(t), result = [], spans = [];
     all(t, 'tr').forEach(function(tr) {
         if (!visible(tr) || tr.closest('table') !== t || tr.querySelector('th')) return;
         var cells = Array.prototype.slice.call(tr.children).filter(function(c) { return c.tagName === 'TD'; });
@@ -54,11 +54,27 @@ function rows(t) {
             if (/no (data|records|results)|not found|ไม่มีข้อมูล|ไม่พบข้อมูล/i.test(text(tr))) return;
             throw new Error('Unrecognized table placeholder: ' + text(tr));
         }
-        if (cells.length !== names.length) throw new Error('Table columns changed; refusing a shifted row.');
+        // Approval groups share their Seq cell through rowspan. Expand the HTML grid before mapping headings.
+        var expanded = [], column = 0;
+        spans.forEach(function(span, i) {
+            if (span && span.remaining > 0) { expanded[i] = span.cell; span.remaining--; }
+        });
+        cells.forEach(function(cell) {
+            while (expanded[column]) column++;
+            if (Number(cell.colSpan) !== 1 || column >= names.length)
+                throw new Error('Table columns changed; refusing a shifted row.');
+            var height = Number(cell.rowSpan);
+            if (height < 1 || height > 20000) throw new Error('Unsupported table rowspan.');
+            expanded[column] = cell;
+            if (height > 1) spans[column] = {cell:cell, remaining:height-1};
+            column++;
+        });
+        if (expanded.length !== names.length || names.some(function(name,i) { return !expanded[i]; }))
+            throw new Error('Table columns changed; refusing a shifted row.');
         var values = {};
-        names.forEach(function(name, i) { if (name) values[name] = text(cells[i]); });
+        names.forEach(function(name, i) { if (name) values[name] = text(expanded[i]); });
         if (Object.keys(values).every(function(k) { return !values[k]; })) return;
-        result.push({values:values, element:tr});
+        result.push({values:values, element:tr, cells:expanded});
     });
     return result;
 }
@@ -96,6 +112,35 @@ function next(t) {
         throw new Error('Cannot establish the current page.');
     return null;
 }
+function first(t) {
+    var p=pager(t);
+    if (!p) return null;
+    var active=p.querySelector('.active');
+    if (active && text(active)==='1') return null;
+    var buttons=all(p,'a,button').filter(function(a) { return visible(a) && !disabled(a); });
+    var numbered=buttons.filter(function(a) { return text(a)==='1'; });
+    if (numbered.length===1) return numbered[0];
+    var firstButtons=buttons.filter(function(a) {
+        return a.getAttribute('ng-switch-when')==='first' || a.getAttribute('data-ng-switch-when')==='first'
+            || /^first( page)?$/i.test(text(a)) || /^first/i.test(a.getAttribute('aria-label') || '');
+    });
+    if (firstButtons.length===1) return firstButtons[0];
+    throw new Error('Cannot return to the first step page without reopening the request.');
+}
+if (op==='hasStepDialog' || op==='closeStepDialog') {
+    var dialogs=all(document,'.modal,[role="dialog"]').filter(function(d) {
+        return visible(d) && all(d,'a,button[role="tab"]').some(function(a) { return visible(a) && text(a)==='Approval Line'; });
+    });
+    if (dialogs.length>1) throw new Error('More than one step dialog is visible.');
+    if (op==='hasStepDialog') return dialogs.length===1;
+    if (!dialogs.length) return null;
+    var close=all(dialogs[0],'button,a').filter(function(a) {
+        return visible(a) && (a.getAttribute('data-dismiss')==='modal' || a.getAttribute('data-bs-dismiss')==='modal'
+            || /^close$/i.test(a.getAttribute('aria-label') || '') || /^close$/i.test(text(a))
+            || a.classList.contains('close') && /^[×x]$/i.test(text(a)));
+    });
+    return close.length ? close[0] : null;
+}
 if (op === 'idle') {
     if (document.readyState !== 'complete') return false;
     if (all(document,'.swal2-image,.blockUI.blockOverlay,.loading-overlay').some(visible)) return false;
@@ -127,13 +172,14 @@ if (op === 'exists') return !!t;
 if (!t) return null;
 if (op === 'snapshot') return rows(t).map(function(r) { return r.values; });
 if (op === 'next') return next(t);
+if (op === 'first') return first(t);
 if (op === 'link') {
     var column=kind === 'requests' ? 'refno' : 'step';
     var matches=rows(t).filter(function(r) { return r.values[column] === wanted; });
     if (matches.length > 1) throw new Error('Duplicate ' + column + ' on this page.');
     if (!matches.length) return null;
     var index=columns(t).indexOf(column);
-    var links=all(matches[0].element.children[index],'a').filter(function(a) { return visible(a) && text(a) === wanted; });
+    var links=all(matches[0].cells[index],'a').filter(function(a) { return visible(a) && text(a) === wanted; });
     if (links.length !== 1) throw new Error('Expected one detail link for ' + wanted);
     return links[0];
 }

@@ -1,17 +1,17 @@
 # List Approver Step PROMs
 
-A **Java 8** desktop application that reads every request visible in PROMs Pending Approval, opens every Activity/Milestone step, and exports its Approval Line to CSV.
+A **Java 8** desktop application that searches PROMs Pending Approval by the Ref No / Project ID rows in input.csv, opens every Activity/Milestone step, and exports its Approval Line to CSV.
 
 ## Download and start
 
 1. Open the [latest release](https://github.com/kantapon-sam/List_approver_step_proms/releases/latest) and download the asset ending in **-windows.zip**.
 2. Extract the whole ZIP to a writable folder. Keep `lib` beside `List_approver_step_proms.jar`.
 3. Double-click `List_approver_step_proms.jar` with Java 8. No CMD launcher is needed.
-4. Click **Read all approvals**. Chrome opens for sign-in.
-5. Sign in, including any OTP/CAPTCHA. The application reads all request pages, then all steps and all approval pages automatically.
-6. Click **Open output folder** to find the report. Progress shows the request-page count, total requests, and current request/step. **Stop** saves a clearly marked partial report.
+4. Fill in input.csv with Ref No or Project ID, one ID per row, and save it. Click **Choose CSV...** if the file is in another folder.
+5. Click **Read input CSV** and sign in to Chrome, including any OTP/CAPTCHA. Each input ID is searched directly. A Ref No found on the first filtered page is processed immediately; Project IDs include all matching filtered result pages. Every step and approval page is read automatically.
+6. Click **Open output folder** to find the report. Progress shows each input ID and its current step. **Stop** saves a clearly marked partial report.
 
-**No Ref No, Project ID or Steps entry is required for the desktop workflow.** Multiple projects are handled automatically as their requests are read from the website.
+**There is no Steps column to fill in.** Enter multiple Ref No / Project ID values on separate rows. The program searches only those IDs and reads their steps from the website; it does not scan the full unfiltered request list.
 
 ## Login and local files
 
@@ -20,7 +20,7 @@ The Windows ZIP contains actual filenames with no user data:
 | File | Initial contents | Purpose |
 | --- | --- | --- |
 | `Login.txt` | Blank User and Password entries | Optional sign-in prefill |
-| `input.csv` | `Ref No,Project ID` header only | Optional command-line lookup |
+| `input.csv` | `Ref No,Project ID` header only | IDs to search in the desktop or command-line workflow |
 | `proms.properties` | Empty | Optional settings; built-in defaults apply |
 
 To enable prefill, edit `Login.txt` locally:
@@ -38,25 +38,27 @@ Real credentials, user input, settings, reports and logs are excluded from Git a
 
 The default list is `https://proms.truecorp.co.th/proms/pendingapprove`. **Only requests visible to the signed-in account in that list are included.** Completed requests or projects outside that list may be absent. This is not a complete inventory of all PROMs projects.
 
-The application reads navigation and detail tables; it does not approve, reject or submit requests. It clears the list search, collects all pages, deduplicates exact reference numbers, and opens each request's Activity/Milestone and Approval Line pages.
+The application reads navigation and detail tables; it does not approve, reject or submit requests. It searches each input ID, matches IDs exactly, deduplicates reference numbers within a query, and opens each matching request's Activity/Milestone and Approval Line pages. Request pagination is limited to filtered searches: all pages for Project IDs, or fallback pages if an exact Ref No is not on the first page. Empty searches are rejected.
 
-Reports use UTF-8 with a BOM for Excel, one row per approver per step. Columns include Ref No, Project ID, Project Name, Request Type, Requester, Step, Description, Approval Order, Approver, Status, Approved Date, Result, Message, Source URL and Extracted At. The leading Input columns identify the source-list row and its IDs in automatic mode, or the CSV query in command-line mode.
+Reports use UTF-8 with a BOM for Excel and exactly six columns: **Ref No, Project ID, Step, Approver, Status, Approved Date**. Step identifies TK07, TK08, etc.; other step codes retain their original name. Each approval record from every step is included. Progress and diagnostic messages go into the companion `.csv.log` file. The application opens each Ref No once and finishes all of its steps before moving to the next request.
 
-Approved Date is preserved exactly as displayed, including blank values. Names and other website data retain their original language. Approval Order is the displayed row order, not an inferred authorization level. Extracted At uses Asia/Bangkok. Source URL identifies the list page because details may share the same URL. Text that Excel could interpret as a formula is escaped. Existing report files are never overwritten.
+Approved Date is preserved exactly as displayed, including blank values. Names and status text retain their original language. Text that Excel could interpret as a formula is escaped. Existing report and log files are never overwritten.
 
-| Result | Meaning |
+The log records these diagnostics. The CSV includes every approval status, including pending or waiting records. A step with an empty Approval Line is included with blank Approver, Status and Approved Date values; the application does not invent a status:
+
+| Log status | Meaning |
 | --- | --- |
 | `OK` | Approval data was read successfully |
 | `NO_APPROVAL_ROWS` | Approval Line exists but is empty |
 | `NO_STEPS` | Activity/Milestone exists but has no steps |
-| `NOT_FOUND_IN_SCOPE` | An optional CSV ID has no exact match in this list |
+| `NOT_FOUND_IN_SCOPE` | A requested CSV ID has no exact match in this list |
 | `STEP_NOT_FOUND` | A legacy CSV step filter has no matching step |
 | `READ_ERROR` | A request or step could not be read; see Message |
 | `RUN_ERROR` / `CANCELLED` | The run stopped early; the report may be partial |
 
-If the list is empty, the application logs that no requests are visible and writes a header-only report. Unexpected table headings or incomplete pagination produce an error rather than guessed columns.
+If a search has no matching requests, the log records NOT_FOUND_IN_SCOPE for that input row. Unexpected table headings or incomplete pagination produce a logged error rather than guessed columns. A cancelled or failed run can leave a partial CSV; check its companion log and the completion message.
 
-Live extraction has not yet been verified against the current PROMs website. Automated browser tests use a local synthetic portal to check all-request discovery, pagination, step navigation, approval extraction and read-only behavior.
+Automated browser tests use a local synthetic portal to check two direct input references without request-page clicks, filtered Project ID pagination, step navigation, approval extraction and read-only behavior. Version 1.0.2 was also verified read-only with user-provided live inputs, including approved records, waiting approvals and empty approval lines, without extraction errors. Other projects and page layouts may differ; the log reports any unsupported table structure.
 
 ## Updates
 
@@ -68,9 +70,9 @@ Updates preserve Login.txt, input.csv, proms.properties, reports and ChromeDrive
 
 The canonical ZIP without `-windows` is for the updater and contains only application files, keeping compatibility with v1.0.0. New users should download **-windows.zip**, which also contains the blank real-name configuration files. Both packages contain the same application version.
 
-## Optional command-line input
+## Input format and command line
 
-The normal desktop workflow does not read input.csv. For a restricted command-line lookup, its only required columns are:
+The desktop and command-line workflows both read input.csv. The supplied columns are:
 
 ```csv
 Ref No,Project ID
@@ -79,7 +81,6 @@ Ref No,Project ID
 Enter either Ref No or Project ID on each row. Multiple IDs go on separate rows. If both are present, both must match. A Project ID expands to every matching request in the configured list. All steps are read automatically; there is no Steps column in the supplied input file. Keep IDs as text in Excel to preserve leading zeroes. Legacy three-column CSV files remain readable for compatibility.
 
 ```text
-java -jar List_approver_step_proms.jar --all
 java -jar List_approver_step_proms.jar --input input.csv
 java -jar List_approver_step_proms.jar --check-input --input input.csv
 java -jar List_approver_step_proms.jar --check-login
@@ -87,7 +88,7 @@ java -jar List_approver_step_proms.jar --check-update
 java -jar List_approver_step_proms.jar --version
 ```
 
-Use `--output path/report.csv` to choose an output file or `--config path/proms.properties` for settings. `--all` and `--input` are mutually exclusive. Exit codes: 0 complete, 1 failed, 2 unresolved records, 130 stopped. An untouched header-only input.csv needs at least one ID before using optional CSV mode.
+Use `--output path/report.csv` to choose an output file or `--config path/proms.properties` for settings. The old `--all` mode is removed to prevent unfiltered scans. Exit codes: 0 complete, 1 failed, 2 unresolved records, 130 stopped. An untouched header-only input.csv needs at least one ID before running.
 
 ## Optional settings
 

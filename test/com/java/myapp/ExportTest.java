@@ -44,17 +44,21 @@ public final class ExportTest {
 
         FakePortal portal = new FakePortal();
         StringWriter output = new StringWriter(); Csv.write(output,Exporter.HEADER);
-        Exporter exporter = new Exporter(portal,output,"fixture-only",s -> { });
+        List<String> exportLog = new ArrayList<>();
+        Exporter exporter = new Exporter(portal,output,"fixture-only",exportLog::add);
         exporter.run(queries("Ref No,Project ID,Steps\n26070892,,\n404,,\n26070892,,TK08;TK99\n"));
         List<List<String>> report = Csv.parse(new StringReader(output.toString()));
-        equal(8,report.size(),"rows include empty/error records and all approvers");
-        equal("Approved",report.get(1).get(12),"approval status");
-        equal("10/08/2026 14:25:00",report.get(1).get(13),"approved date text retained");
-        equal("",report.get(2).get(13),"pending date stays empty");
-        equal("NO_APPROVAL_ROWS",report.get(3).get(14),"empty approval table is explicit");
-        equal("READ_ERROR",report.get(4).get(14),"failed step is explicit");
-        equal("NOT_FOUND_IN_SCOPE",report.get(5).get(14),"not found is scope-qualified");
-        equal("STEP_NOT_FOUND",report.get(6).get(14),"one missing requested step is reported");
+        equal(5,report.size(),"CSV includes actual approvers and steps with empty approval lines");
+        equal(Arrays.asList("Ref No","Project ID","Step","Approver","Status","Approved Date"),report.get(0),"exactly the six requested columns");
+        equal("TK07",report.get(1).get(2),"short TK step label identifies each approval row");
+        equal("Approved",report.get(1).get(4),"approval status");
+        equal("10/08/2026 14:25:00",report.get(1).get(5),"approved date text retained");
+        equal("",report.get(2).get(5),"pending date stays empty");
+        equal("Pending",report.get(2).get(4),"unapproved records are included without a status filter");
+        equal("TK08",report.get(3).get(2),"step without assigned approvers remains visible");
+        check(report.get(3).subList(3,6).stream().allMatch(String::isEmpty),"empty approval line does not invent an approver, status or date");
+        for (String result : Arrays.asList("NO_APPROVAL_ROWS","READ_ERROR","NOT_FOUND_IN_SCOPE","STEP_NOT_FOUND"))
+            check(exportLog.stream().anyMatch(s -> s.contains(result)),"diagnostic is retained in log: " + result);
         equal(3,exporter.problems,"problem count");
         for (List<String> row : report) equal(Exporter.HEADER.size(),row.size(),"rectangular CSV");
 
@@ -66,9 +70,13 @@ public final class ExportTest {
         StringWriter automaticOutput = new StringWriter();
         List<String> automaticLog = new ArrayList<>();
         Exporter automatic = new Exporter(portal,automaticOutput,"fixture-only",automaticLog::add);
-        automatic.runAll();
-        equal(8,automatic.rows,"automatic run covers both requests and every step without input CSV");
-        check(automaticLog.stream().anyMatch(s -> s.startsWith("Request 2 of 2:")),"automatic progress includes total");
+        portal.requestPageScans = 0; portal.searchedValues.clear(); portal.openedReferences.clear();
+        automatic.run(queries("Ref No,Project ID\n26070892,\n26070893,\n"));
+        equal(6,automatic.rows,"both references include approvers and unstarted steps");
+        equal(Arrays.asList("26070892","26070893"),portal.searchedValues,"only the two input IDs are searched");
+        equal(Arrays.asList("26070892","26070893"),portal.openedReferences,"each request is opened once for all its steps");
+        equal(0,portal.requestPageScans,"direct reference matches do not scan request pages");
+        check(automaticLog.stream().anyMatch(s -> s.startsWith("Search 2 of 2:")),"input progress includes total");
         equal(2,Exporter.matchingRequests(new Query(0,"","",Collections.emptySet()),Arrays.asList(requests.get(0),requests.get(0),requests.get(2))).size(),"automatic inventory deduplicates repeated requests");
         rejects(() -> Exporter.matchingRequests(new Query(0,"","",Collections.emptySet()),Arrays.asList(map("projectid","240258"))));
         List<Query> multipleProjects = queries("Ref No,Project ID\n,240258\n,240259\n");
@@ -83,6 +91,7 @@ public final class ExportTest {
         rejects(() -> new Settings(shortWait));
         rejects(() -> ListApproverProms.arguments(new String[]{"--input"}));
         rejects(() -> ListApproverProms.arguments(new String[]{"--wat"}));
+        rejects(() -> ListApproverProms.arguments(new String[]{"--all"}));
         System.out.println("PASS: " + checks + " CSV, matching, export, partial failure, cancellation, and settings checks.");
     }
 
@@ -93,11 +102,23 @@ public final class ExportTest {
     }
     private static final class FakePortal implements Portal {
         String search; boolean cancel;
-        public void search(String value) { if (cancel) throw new PromsBrowser.Cancelled(); search=value; }
-        public void openRequest(String ref) { }
+        int requestPageScans;
+        List<String> searchedValues = new ArrayList<>();
+        List<String> openedReferences = new ArrayList<>();
+        public void search(String value) {
+            if (cancel) throw new PromsBrowser.Cancelled();
+            if (value.isEmpty()) throw new AssertionError("Unfiltered search is forbidden");
+            search=value; searchedValues.add(value);
+        }
+        public void openRequest(String ref) { openedReferences.add(ref); }
+        public List<Map<String,String>> currentRows(String kind) { return requestRows(); }
         public List<Map<String,String>> allRows(String kind) {
             if (kind.equals("steps")) return Arrays.asList(map("step","NT_IE_TK07","description","Commissioning"),
                 map("step","NT_IE_TK08","description","PAT"), map("step","NT_IE_TK09","description","PAC"));
+            requestPageScans++;
+            return requestRows();
+        }
+        private List<Map<String,String>> requestRows() {
             if (search.equals("404")) return Collections.emptyList();
             return Arrays.asList(map("refno","26070892","projectname","240258 : Demo"),
                 map("refno","26070893","projectname","240258 : Demo"));

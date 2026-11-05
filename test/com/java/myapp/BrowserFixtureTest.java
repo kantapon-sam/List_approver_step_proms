@@ -48,25 +48,31 @@ public final class BrowserFixtureTest {
             try { browser.prefillLogin(dummy); throw new AssertionError("credentials filled outside login page"); }
             catch (IllegalStateException expected) { }
             require(browser.allRows("requests").size()==3,"request pagination");
+            driver.executeScript("localStorage.setItem('requestNextClicks','0'); localStorage.setItem('searchCount','0'); localStorage.setItem('openRequests','0');");
             StringWriter report = new StringWriter(); Csv.write(report,Exporter.HEADER);
             Exporter exporter = new Exporter(browser,report,"LOCAL FIXTURE ONLY",System.out::println);
-            exporter.runAll();
+            exporter.run(ExportTest.queries("Ref No,Project ID\n26070892,\n26070893,\n"));
             List<List<String>> rows = Csv.parse(new StringReader(report.toString()));
-            require(exporter.rows==12,"all three requests and both steps exported without CSV input");
+            require(exporter.rows==10,"both input references and every step, including grouped approvers, exported");
             require(exporter.problems==0,"automatic export has no issues");
-            require(rows.get(1).get(8).equals("NT_IE_TK07"),"first step");
-            require(rows.get(3).get(8).equals("NT_IE_TK08"),"second step from next page");
-            require(rows.get(3).get(11).equals("NT_IE_TK08_TEST_1"),"no stale modal data");
-            require(rows.get(2).get(13).isEmpty(),"pending date blank");
-            require(rows.size()==13,"header and all twelve approval rows");
-            require(rows.stream().skip(1).map(row -> row.get(3)).distinct().count()==3,"every request page included");
+            require(rows.get(1).get(2).equals("TK07") && rows.get(1).get(3).equals("NT_IE_TK07_TEST_1"),"first step and approver");
+            require(rows.get(3).get(2).equals("TK08") && rows.get(3).get(3).equals("NT_IE_TK08_TEST_1"),"second step from next page without stale modal data");
+            require(rows.get(2).get(5).isEmpty(),"pending date blank");
+            require(rows.size()==11,"header and all ten approval rows");
+            require(rows.get(4).get(3).equals("NT_IE_TK08_TEST_1B") && rows.get(4).get(4).equals("Pending"),"rowspan keeps approver and status aligned");
+            require(rows.stream().allMatch(row -> row.size()==6),"exactly six columns in every row");
+            require(rows.stream().skip(1).map(row -> row.get(0)).distinct().count()==2,"both input references included");
+            require(rows.stream().skip(1).noneMatch(row -> row.get(0).equals("260708920")),"similar unrelated reference excluded");
+            require("0".equals(driver.executeScript("return localStorage.getItem('requestNextClicks');")),"direct references never click request pagination");
+            require("2".equals(driver.executeScript("return localStorage.getItem('searchCount');")),"exactly one search per input reference");
+            require("2".equals(driver.executeScript("return localStorage.getItem('openRequests');")),"exactly one request opening per reference, not per step");
             require(((Number)((JavascriptExecutor)driver).executeScript("return window.writeActions")).intValue()==0,"no approve actions");
             // A missing Approval Line column must fail visibly rather than export shifted values.
             browser.openRequest("26070892");
             ((JavascriptExecutor)driver).executeScript("var old=approvals; approvals=function(s,p){old(s,p);document.querySelector('#approvals th:last-child').innerText='Unexpected Column'};");
             try { browser.approvals("NT_IE_TK07"); throw new AssertionError("changed columns accepted"); }
             catch (org.openqa.selenium.TimeoutException expected) { }
-            System.out.println("PASS: local browser fixture: login prefill/manual submit, request/step/approval pagination, async loads, exact IDs, blank dates, modal isolation, changed-column rejection.");
+            System.out.println("PASS: local browser fixture: one search/open per reference, two inputs, six output columns, grouped approvers with rowspan, filtered project pages, all step/approval pages, blank dates, modal isolation and changed-column rejection.");
         } finally { if (driver!=null) driver.quit(); server.stop(0); }
     }
     private static void require(boolean value,String message) { if(!value) throw new AssertionError(message); }
