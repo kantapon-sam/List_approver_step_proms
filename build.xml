@@ -32,9 +32,16 @@
         <java classname="com.java.myapp.DefaultFilesTest" fork="true" failonerror="true">
             <classpath path="${run.test.classpath}"/>
         </java>
+        <java classname="com.java.myapp.ReportSnapshotTest" fork="true" failonerror="true">
+            <classpath path="${run.test.classpath}"/>
+        </java>
     </target>
     <target name="test-fixture" depends="compile-test" description="Headless browser on a localhost fixture only.">
         <java classname="com.java.myapp.BrowserFixtureTest" fork="true" failonerror="true">
+            <classpath path="${run.test.classpath}"/>
+            <sysproperty key="webdriver.chrome.driver" value="${fixture.driver}"/>
+        </java>
+        <java classname="com.java.myapp.BrowserSessionFixtureTest" fork="true" failonerror="true">
             <classpath path="${run.test.classpath}"/>
             <sysproperty key="webdriver.chrome.driver" value="${fixture.driver}"/>
         </java>

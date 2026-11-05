@@ -9,3 +9,5 @@
 - Build/test with scripts/Build.ps1 using JDK 8. The updater's download, archive validation, rollback, process handoff and restart tests must pass before publishing changes to it.
 - For an authorized release, update version.properties/CHANGELOG, validate, fetch first, commit only task source/tests/docs/config, and use normal fast-forward-safe pushes to main. The release workflow publishes on version changes. Never force-push or overwrite a published release.
 - Verify the remote commit, the published release assets and the live update feed before claiming that a release is available to users.
+- Keep only one Desktop installation at Program Automation WEB/List_approver_step_proms. Update it in place, preserve its user files, and do not create version-named Desktop folders or copy release ZIPs onto the Desktop. The user will handle further deletion of old copies.
+- Export only the report CSV; show extraction logs in the application instead of creating .csv.log files. Report filenames include date/time to seconds, without milliseconds.

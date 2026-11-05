@@ -10,15 +10,22 @@ final class Exporter {
     private final Writer writer;
     private final String source;
     private final Consumer<String> log;
+    private final RunObserver observer;
     int rows, problems;
 
     Exporter(Portal portal, Writer writer, String source, Consumer<String> log) {
+        this(portal,writer,source,log,RunObserver.NONE);
+    }
+
+    Exporter(Portal portal, Writer writer, String source, Consumer<String> log, RunObserver observer) {
         this.portal = portal; this.writer = writer; this.source = source; this.log = log;
+        this.observer = observer;
     }
 
     void run(List<Query> queries) throws IOException {
         int completed = 0;
         for (Query query : queries) {
+            observer.query(completed+1,queries.size(),query.search());
             log.accept("Search " + (++completed) + " of " + queries.size() + ": "
                 + (query.ref.isEmpty() ? "Project ID " : "Ref No ") + query.search());
             List<Map<String,String>> requests;
@@ -62,6 +69,7 @@ final class Exporter {
         }
         for (Map<String,String> step : steps) {
             if (!query.acceptsStep(get(step,"step"))) continue;
+            observer.step(get(request,"refno"),get(step,"step"));
             log.accept("  Ref " + get(request,"refno") + " / " + get(step,"step") + " / Approval Line");
             List<Map<String,String>> approvals;
             try {
@@ -101,11 +109,13 @@ final class Exporter {
             String order, String result, String message) throws IOException {
         if (result.equals("OK") || result.equals("NO_APPROVAL_ROWS")) {
             String stepLabel = get(step,"step").replaceFirst("^.*_(TK[0-9]+)$", "$1");
-            Csv.write(writer, Arrays.asList(get(request,"refno"),projectId(request),stepLabel,get(approval,"approver"),get(approval,"status"),get(approval,"approveddate")));
+            List<String> values = Arrays.asList(get(request,"refno"),projectId(request),stepLabel,get(approval,"approver"),get(approval,"status"),get(approval,"approveddate"));
+            Csv.write(writer, values);
             rows++;
+            observer.row(values);
         }
         if (!result.equals("OK")) {
-            if (!result.equals("NO_APPROVAL_ROWS")) problems++;
+            if (!result.equals("NO_APPROVAL_ROWS")) { problems++; observer.issue(); }
             log.accept("  " + result + " | Input " + q.record + " / Ref " + (get(request,"refno").isEmpty() ? q.ref : get(request,"refno"))
                 + " / Project " + (projectId(request).isEmpty() ? q.project : projectId(request)) + " / Step " + get(step,"step") + ": " + message);
         }

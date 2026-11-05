@@ -32,6 +32,17 @@ public final class ExportTest {
         check(decoded.get(5).startsWith("'\t"),"leading tab escaped");
         Path temp = Files.createTempFile("approval-output-",".csv");
         try { rejects(() -> Csv.create(temp)); } finally { Files.delete(temp); }
+        Path noOutput = Files.createTempDirectory("proms-cancelled-");
+        try {
+            Path resultFile = ListApproverProms.newOutput(noOutput);
+            check(resultFile.getFileName().toString().matches("approval_steps_[0-9]{8}_[0-9]{6}\\.csv"),"report filename has no milliseconds");
+            List<String> messages = new ArrayList<>();
+            int status = ListApproverProms.export(queries("Ref No\n26070892"),new Settings(new Properties()),
+                LoginCredentials.parse(new StringReader("User,\nPassword,\n")),resultFile,() -> true,messages::add);
+            equal(130,status,"cancelled before sign-in");
+            try(java.util.stream.Stream<Path> files=Files.list(noOutput)) { equal(0L,files.count(),"no CSV or log file before extraction starts"); }
+            check(messages.stream().anyMatch(s -> s.contains("No CSV created")),"failure details stay in the on-screen log");
+        } finally { Files.delete(noOutput); }
 
         List<Map<String,String>> requests = Arrays.asList(
             map("refno","26070892","projectname","240258 : Demo"),

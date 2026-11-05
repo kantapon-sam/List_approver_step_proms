@@ -43,6 +43,15 @@ final class PromsBrowser implements Portal {
         });
     }
 
+    void verifySession() {
+        checkCancelled();
+        String url = driver.getCurrentUrl();
+        if (!url.startsWith("https://proms.truecorp.co.th/proms/") || url.contains("/login"))
+            throw new IllegalStateException("The PROMs session is not signed in.");
+        requireTable("requests");
+        settle();
+    }
+
     void prefillLogin(LoginCredentials credentials) {
         if (!credentials.available()) return;
         if (!driver.getCurrentUrl().startsWith("https://proms.truecorp.co.th/proms/login/"))

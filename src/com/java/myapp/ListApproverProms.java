@@ -7,13 +7,9 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.*;
 import javax.swing.*;
-import javax.swing.filechooser.FileNameExtensionFilter;
 import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.chrome.*;
 
 public final class ListApproverProms {
     public static final String VERSION = readVersion();
@@ -131,126 +127,60 @@ public final class ListApproverProms {
     }
 
     static int export(List<Query> queries, Settings settings, LoginCredentials credentials, Path output, BooleanSupplier stop, Consumer<String> log) throws IOException {
+        return export(queries,settings,credentials,output,stop,log,RunObserver.NONE);
+    }
+
+    static int export(List<Query> queries, Settings settings, LoginCredentials credentials, Path output, BooleanSupplier stop, Consumer<String> log, RunObserver observer) throws IOException {
         WebDriver driver = null;
-        Consumer<String> screenLog = log;
-        Path logFile = output.resolveSibling(output.getFileName().toString() + ".log");
-        try (Writer writer = Csv.create(output);
-             Writer diagnostic = Files.newBufferedWriter(logFile,java.nio.charset.StandardCharsets.UTF_8,StandardOpenOption.CREATE_NEW)) {
-            log = value -> {
-                screenLog.accept(value);
-                try { diagnostic.write(value + System.lineSeparator()); diagnostic.flush(); }
-                catch (IOException ex) { throw new UncheckedIOException(ex); }
-            };
-            Csv.write(writer, Exporter.HEADER);
-            log.accept("Log: " + logFile.toAbsolutePath());
+        boolean created = false;
+        try {
             try {
+                if (stop.getAsBoolean()) throw new PromsBrowser.Cancelled();
                 log.accept("Checking ChromeDriver...");
+                observer.phase("Starting", "Checking Chrome and preparing sign-in...");
                 File chrome = prepareDriver();
                 if (stop.getAsBoolean()) throw new PromsBrowser.Cancelled();
-                ChromeOptions options = new ChromeOptions(); options.setBinary(chrome);
-                driver = new ChromeDriver(options);
-                driver.manage().timeouts().pageLoadTimeout(settings.timeoutSeconds, TimeUnit.SECONDS);
-                driver.manage().timeouts().setScriptTimeout(settings.timeoutSeconds, TimeUnit.SECONDS);
-                driver.manage().window().maximize();
+                driver = BrowserSession.create(chrome,settings,false);
                 PromsBrowser portal = new PromsBrowser(driver,settings,stop,log);
                 log.accept(credentials.available() ? "User/Password will be filled from Login.txt. Click Sign in in Chrome and complete OTP/CAPTCHA if required."
                     : "Enter your User/Password and sign in to PROMs in Chrome.");
                 log.accept("Waiting up to " + settings.loginSeconds + " seconds for sign-in.");
+                observer.phase("Sign in", "Complete Sign in / OTP / CAPTCHA in the Chrome window.");
                 portal.login(credentials);
-                log.accept("Signed in. Reading " + settings.listUrl);
-                Exporter exporter = new Exporter(portal,writer,settings.listUrl,log);
-                log.accept("Reading " + queries.size() + " input rows. Searching each ID directly.");
-                exporter.run(queries);
-                log.accept("Saved: " + output.toAbsolutePath());
-                return exporter.problems == 0 ? 0 : 2;
+                observer.phase("Starting background mode", "Keeping your signed-in session while closing the login window...");
+                log.accept("Signed in. Starting background extraction...");
+                driver = BrowserSession.inBackground(driver,() -> BrowserSession.create(chrome,settings,true),settings,stop);
+                portal = new PromsBrowser(driver,settings,stop,log);
+                observer.phase("Running in background", "Chrome is hidden. Progress and results remain in this window.");
+                log.accept("Background session ready. The login window is closed.");
+                try (Writer writer = Csv.create(output)) {
+                    created = true;
+                    Csv.write(writer, Exporter.HEADER);
+                    Exporter exporter = new Exporter(portal,writer,settings.listUrl,log,observer);
+                    log.accept("Reading " + queries.size() + " input rows. Searching each ID directly.");
+                    exporter.run(queries);
+                    log.accept("Saved: " + output.toAbsolutePath());
+                    return exporter.problems == 0 ? 0 : 2;
+                }
             } catch (PromsBrowser.Cancelled ex) {
-                log.accept("CANCELLED: Stopped by user. This CSV is partial; remaining inputs/steps were not processed.");
-                log.accept("Cancelled. Partial CSV: " + output.toAbsolutePath()); return 130;
+                log.accept("CANCELLED: Stopped by user. Remaining inputs/steps were not processed.");
+                log.accept(created ? "Partial CSV: " + output.toAbsolutePath() : "No CSV created for this run."); return 130;
             } catch (Exception ex) {
-                log.accept("RUN_ERROR: This CSV may be partial.");
-                log.accept("ERROR: " + Exporter.message(ex));
-                log.accept("Incomplete CSV: " + output.toAbsolutePath()); return 1;
+                log.accept("RUN_ERROR: " + Exporter.message(ex));
+                log.accept(created ? "Incomplete CSV: " + output.toAbsolutePath() : "No CSV created for this run."); return 1;
             }
         } finally {
-            if (driver != null) try { driver.quit(); } catch (RuntimeException ignored) { screenLog.accept("The automation Chrome session could not be closed."); }
+            if (driver != null) try { driver.quit(); } catch (RuntimeException ignored) { log.accept("The automation Chrome session could not be closed."); }
+            log.accept("Browser work finished. Results remain in the application window.");
         }
     }
 
-    private static Path newOutput(Path directory) {
+    static Path newOutput(Path directory) {
         return directory.resolve("approval_steps_" + LocalDateTime.now(ZoneId.of("Asia/Bangkok"))
-            .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS")) + ".csv");
+            .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".csv");
     }
 
     private static void showWindow() {
-        try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); } catch (Exception ignored) { }
-        JFrame frame = new JFrame("List Approver Step PROMs " + VERSION);
-        frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-        JPanel panel = new JPanel(new BorderLayout(12,12));
-        panel.setBorder(BorderFactory.createEmptyBorder(18,18,18,18));
-        JPanel header = new JPanel(new GridLayout(0,1,4,4));
-        JLabel title = new JLabel("PROMs • Approval Line → CSV"); title.setFont(title.getFont().deriveFont(Font.BOLD,22));
-        header.add(title);
-        header.add(new JLabel("Enter Ref No or Project ID in input.csv, one ID per row. Each ID is searched directly."));
-        header.add(new JLabel("All Activity/Milestone steps are read automatically. No Steps column is needed."));
-        header.add(new JLabel("Project IDs include all matching filtered pages. Scope: Pending Approval."));
-        header.add(new JLabel("Login.txt can fill User/Password. Complete sign-in in Chrome when prompted."));
-        JTextField input = new JTextField(appFile("input.csv").toString());
-        JButton browse = new JButton("Choose CSV...");
-        JPanel fileRow = new JPanel(new BorderLayout(8,0)); fileRow.add(input); fileRow.add(browse,BorderLayout.EAST);
-        header.add(fileRow);
-        JTextArea logArea = new JTextArea(18,90); logArea.setEditable(false); logArea.setLineWrap(true); logArea.setWrapStyleWord(true);
-        panel.add(header,BorderLayout.NORTH); panel.add(new JScrollPane(logArea),BorderLayout.CENTER);
-        JButton start = new JButton("Read input CSV"), cancel = new JButton("Stop"), open = new JButton("Open output folder");
-        cancel.setEnabled(false);
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        actions.add(start); actions.add(cancel); actions.add(open); panel.add(actions,BorderLayout.SOUTH);
-        AtomicBoolean stop = new AtomicBoolean(), running = new AtomicBoolean();
-        Consumer<String> log = value -> SwingUtilities.invokeLater(() -> { logArea.append(value+"\n"); logArea.setCaretPosition(logArea.getDocument().getLength()); });
-        UpdatePanel updates=new UpdatePanel(frame,APP_DIRECTORY,running::get,log,busy -> {
-            start.setEnabled(!busy && !running.get());
-            browse.setEnabled(!busy && !running.get()); input.setEnabled(!busy && !running.get());
-        });
-        header.add(updates);
-        frame.addWindowListener(new java.awt.event.WindowAdapter() {
-            @Override public void windowClosing(java.awt.event.WindowEvent event) {
-                if(updates.busy()) { log.accept("Preparing the update. Please wait..."); return; }
-                if (running.get()) { stop.set(true); log.accept("Stopping after the current browser operation..."); }
-                else { frame.dispose(); System.exit(0); }
-            }
-        });
-        browse.addActionListener(event -> {
-            JFileChooser chooser = new JFileChooser(APP_DIRECTORY.toFile());
-            chooser.setFileFilter(new FileNameExtensionFilter("CSV files","csv"));
-            if (chooser.showOpenDialog(frame) == JFileChooser.APPROVE_OPTION) input.setText(chooser.getSelectedFile().getAbsolutePath());
-        });
-        start.addActionListener(event -> {
-            if(updates.busy()) return;
-            final List<Query> queries; final Settings settings; final LoginCredentials credentials;
-            try { queries = Query.read(Paths.get(input.getText())); settings = Settings.read(appFile("proms.properties")); credentials = LoginCredentials.readOptional(appFile("Login.txt")); }
-            catch (Exception ex) { JOptionPane.showMessageDialog(frame,Exporter.message(ex),"Check input CSV / settings / Login.txt",JOptionPane.ERROR_MESSAGE); return; }
-            running.set(true); stop.set(false); start.setEnabled(false); cancel.setEnabled(true);
-            browse.setEnabled(false); input.setEnabled(false);
-            updates.refreshControls();
-            Path output = newOutput(appFile("output")); logArea.setText("");
-            new SwingWorker<Integer,Void>() {
-                @Override protected Integer doInBackground() throws Exception { return export(queries,settings,credentials,output,stop::get,log); }
-                @Override protected void done() {
-                    running.set(false); start.setEnabled(true); cancel.setEnabled(false);
-                    browse.setEnabled(true); input.setEnabled(true);
-                    updates.refreshControls();
-                    try {
-                        int code = get();
-                        String message = code == 0 ? "Export complete." : code == 2 ? "Export complete with issues. Check the companion .log file." : "Export stopped before completion. Check the companion .log file; the CSV may be partial.";
-                        JOptionPane.showMessageDialog(frame,message + "\n" + output.toAbsolutePath());
-                    } catch (Exception ex) { log.accept("ERROR: " + Exporter.message(ex.getCause() == null ? ex : ex.getCause())); }
-                }
-            }.execute();
-        });
-        cancel.addActionListener(event -> { stop.set(true); cancel.setEnabled(false); log.accept("Stopping after the current browser operation..."); });
-        open.addActionListener(event -> {
-            try { Path out=appFile("output"); Files.createDirectories(out); Desktop.getDesktop().open(out.toFile()); }
-            catch (Exception ex) { log.accept(Exporter.message(ex)); }
-        });
-        frame.setContentPane(panel); frame.pack(); frame.setLocationRelativeTo(null); frame.setVisible(true);
+        new ExportWindow(APP_DIRECTORY).show();
     }
 }

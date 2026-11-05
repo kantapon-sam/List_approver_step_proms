@@ -1,5 +1,17 @@
 # Releases
 
+## 1.0.3
+
+- Open Chrome for manual sign-in, then continue extraction in a verified background browser session. Transfer authentication in memory only.
+- Preserve the login browser identity and replace the new browser's logged-out cookies before verifying the background session.
+- Close automation browsers when the run finishes, fails or is stopped. Keep the desktop window open with the results and log.
+- Redesign the English desktop window with input/step progress, status counters, a six-column results table and a separate Run log tab.
+- Add Open CSV and restore the latest saved report on startup. Limit the table preview to 1,000 rows while saving and counting the complete report.
+- Export only CSV, with filenames timestamped to seconds and no millisecond suffix. Show extraction logs in the application instead of creating .csv.log files. Create the CSV after the background session is ready.
+- Preserve all existing input, login, settings and reports. Update one installation folder in place; no separate version folder is needed.
+- Verify authenticated background handoff, failed-session cleanup, cancellation, report summaries and existing extraction/updater behavior with Java 8 tests.
+- Live read-only validation completed both user-provided inputs in background mode, including approved, waiting and empty approval lines. The automation browsers closed and the results window remained open. No credentials or live report data are included in this release.
+
 ## 1.0.2
 
 Download **List_approver_step_proms-1.0.2-windows.zip** for a new installation, or use **Update and restart** in the existing application.
