@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="List_approver_step_proms" default="default" basedir=".">
+    <description>Read PROMs Activity/Milestone approval lines and export CSV.</description>
+    <import file="nbproject/build-impl.xml"/>
+    <target name="-pre-init">
+        <property file="version.properties"/>
+        <fail message="Build with JDK 8 only. Set JAVA_HOME to your Java 8 JDK.">
+            <condition><not><equals arg1="${java.specification.version}" arg2="1.8"/></not></condition>
+        </fail>
+    </target>
+    <target name="-post-compile">
+        <copy file="version.properties" todir="${build.classes.dir}/com/java/myapp/resources"/>
+        <copy file="Login.example.txt" todir="${build.classes.dir}/com/java/myapp/resources"/>
+        <copy file="input.example.csv" todir="${build.classes.dir}/com/java/myapp/resources"/>
+        <copy file="proms.properties" tofile="${build.classes.dir}/com/java/myapp/resources/proms.example.properties"/>
+    </target>
+    <target name="test" depends="compile-test" description="Offline regression tests; no PROMs connection.">
+        <java classname="com.java.myapp.ExportTest" fork="true" failonerror="true">
+            <classpath path="${run.test.classpath}"/>
+        </java>
+        <java classname="com.java.myapp.ChromeDriverUpdateTest" fork="true" failonerror="true">
+            <classpath path="${run.test.classpath}"/>
+        </java>
+        <java classname="com.java.myapp.LoginCredentialsTest" fork="true" failonerror="true">
+            <classpath path="${run.test.classpath}"/>
+        </java>
+        <java classname="com.java.myapp.UpdateTest" fork="true" failonerror="true">
+            <jvmarg value="-Djava.awt.headless=true"/>
+            <classpath path="${run.test.classpath}"/>
+        </java>
+    </target>
+    <target name="test-fixture" depends="compile-test" description="Headless browser on a localhost fixture only.">
+        <java classname="com.java.myapp.BrowserFixtureTest" fork="true" failonerror="true">
+            <classpath path="${run.test.classpath}"/>
+            <sysproperty key="webdriver.chrome.driver" value="${fixture.driver}"/>
+        </java>
+    </target>
+    <target name="-check-dist-inputs">
+        <available file="${dist.dir}/input.csv" property="dist.input.exists"/>
+        <available file="${dist.dir}/proms.properties" property="dist.settings.exists"/>
+        <available file="${dist.dir}/Login.txt" property="dist.login.exists"/>
+    </target>
+    <target name="-seed-dist-input" depends="-check-dist-inputs" unless="dist.input.exists">
+        <copy file="input.example.csv" tofile="${dist.dir}/input.csv"/>
+    </target>
+    <target name="-seed-dist-settings" depends="-check-dist-inputs" unless="dist.settings.exists">
+        <copy file="proms.properties" todir="${dist.dir}"/>
+    </target>
+    <target name="-seed-dist-login" depends="-check-dist-inputs" unless="dist.login.exists">
+        <copy file="Login.example.txt" tofile="${dist.dir}/Login.txt"/>
+    </target>
+    <target name="-post-jar" depends="-seed-dist-input,-seed-dist-settings,-seed-dist-login">
+        <copy todir="${dist.dir}/lib"><fileset dir="lib" includes="*.jar"/></copy>
+        <pathconvert property="distribution.classpath" pathsep=" ">
+            <fileset dir="lib" includes="*.jar"/>
+            <chainedmapper><flattenmapper/><globmapper from="*" to="lib/*"/></chainedmapper>
+        </pathconvert>
+        <jar destfile="${dist.jar}" update="true">
+            <manifest>
+                <attribute name="Class-Path" value="${distribution.classpath}"/>
+                <attribute name="Implementation-Version" value="${app.version}"/>
+            </manifest>
+        </jar>
+        <copy file="README.md" todir="${dist.dir}"/>
+        <copy file="input.example.csv" todir="${dist.dir}"/>
+        <copy file="Login.example.txt" todir="${dist.dir}"/>
+        <copy file="proms.properties" tofile="${dist.dir}/proms.example.properties"/>
+        <copy file="CHANGELOG.md" todir="${dist.dir}"/>
+    </target>
+</project>

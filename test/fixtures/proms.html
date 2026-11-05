@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><title>PROMs LOCAL TEST FIXTURE</title>
+<style>body{font:16px sans-serif}table{border-collapse:collapse}td,th{padding:8px;border:1px solid #ccc}.box{padding:8px}.pagination{display:flex;gap:15px;list-style:none}.disabled{color:gray}.modal{position:fixed;inset:10%;background:#eee;padding:20px}a,button{cursor:pointer;color:blue}</style>
+</head><body>
+<h1>LOCAL TEST FIXTURE — synthetic data only</h1>
+<div class="box" id="requests"><input id="txtSearch" placeholder="Search..."><div id="requestTable"></div></div>
+<div id="detail"></div><div id="modal"></div>
+<script>
+window.writeActions=Number(localStorage.getItem('writeActions') || 0);
+let pending=[],timer;
+window.angular={element:()=>({injector:()=>({get:()=>({pendingRequests:pending})})})};
+function later(fn){pending.push(1);setTimeout(()=>{fn();pending.pop()},200)}
+function pager(page,count,callback){return '<ul class="pagination"><li class="active"><a>'+page+'</a></li><li class="'+(page>=count?'disabled':'')+'"><a ng-switch-when="next" onclick="'+(page<count?callback:'')+'">»</a></li></ul>'}
+function table(heads,rows){return '<table><thead><tr>'+heads.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('')+'</tbody></table>'}
+const refs=['26070892','26070893','260708920'];
+function requests(page=1){let query=document.querySelector('#txtSearch').value;let found=refs.filter(r=>(r+' 240258 : Demo').includes(query));let chosen=found.slice(page-1,page);document.querySelector('#requestTable').innerHTML=table(['Request No.','Project Name','Requester','Request Type'],chosen.map(r=>['<a href="#" onclick="openRequest(\''+r+'\');return false">'+r+'</a>','240258 : Demo','LOCAL TEST','Synthetic']))+pager(page,found.length,'later(()=>requests('+(page+1)+'))')}
+document.querySelector('#txtSearch').addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(()=>later(()=>requests()),200)});
+document.querySelector('#txtSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){clearTimeout(timer);later(()=>requests())}});
+let activeRef='';
+function openRequest(ref){later(()=>{activeRef=ref;document.querySelector('#detail').innerHTML='<div class="box"><h2>Activity/Milestone</h2><button data-widget="collapse" onclick="document.querySelector(\'#steps\').style.display=\'block\'">Expand</button><div id="steps" style="display:none"></div></div>';steps(1)})}
+function steps(page){let code=page===1?'NT_IE_TK07':'NT_IE_TK08';document.querySelector('#steps').innerHTML=table(['','Step','Description'],[[''+page,'<a href="#" onclick="openStep(\''+code+'\');return false">'+code+'</a>',page===1?'Commissioning':'PAT']])+pager(page,2,'later(()=>steps(2))')}
+function openStep(step){later(()=>{document.querySelector('#modal').innerHTML='<div class="modal" role="dialog"><h3>'+activeRef+' '+step+'</h3><a href="#" onclick="later(()=>approvals(\''+step+'\',1));return false">Approval Line</a><div class="box" id="approvals"></div><button ng-click="approvalAction(\'APPROVE\')" onclick="localStorage.setItem(\'writeActions\',++window.writeActions)">Approve</button></div>'})}
+function approvals(step,page){let name=step+'_TEST_'+page;let status=page===1?'Approved':'Pending';let date=page===1?'10/08/2026 14:25:00':'';document.querySelector('#approvals').innerHTML=table(['Approver','Status','Approved Date'],[[name,status,date]])+pager(page,2,'later(()=>approvals(\''+step+'\',2))')}
+requests();
+</script></body></html>

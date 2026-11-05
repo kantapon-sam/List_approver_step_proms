@@ -1,0 +1,14 @@
+/build/
+/dist/
+/lib/*.jar
+/output/
+/Login.txt
+/input.csv
+/chromedriver.exe*
+/nbproject/private/
+*.log
+/.updates/
+/.app.lock
+/release/
+*.bak
+*.zip
